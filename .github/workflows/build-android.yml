@@ -1,0 +1,106 @@
+name: Build Android (Capacitor)
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    name: Android APK + AAB
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-
+
+      # ── Build frontend ────────────────────────────────────────────
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      # ── Capacitor sync ────────────────────────────────────────────
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      # ── Build debug APK (for F-Droid / direct download) ──────────
+      - name: Build debug APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      # ── Build release AAB (for Google Play) ───────────────────────
+      - name: Build release AAB
+        run: |
+          cd android
+          ./gradlew bundleRelease
+
+      # ── Sign the release APK (optional — needs keystore secret) ───
+      # Uncomment when you have a signing keystore set up in GitHub secrets:
+      #
+      # - name: Sign release APK
+      #   uses: r0adkll/sign-android-release@v1
+      #   with:
+      #     releaseDirectory: android/app/build/outputs/apk/release
+      #     signingKeyBase64: ${{ secrets.ANDROID_SIGNING_KEY }}
+      #     alias: ${{ secrets.ANDROID_KEY_ALIAS }}
+      #     keyStorePassword: ${{ secrets.ANDROID_KEY_STORE_PASSWORD }}
+      #     keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      # ── Upload artifacts ──────────────────────────────────────────
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightreader-debug-${{ github.ref_name }}.apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 30
+
+      - name: Upload release AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightreader-release-${{ github.ref_name }}.aab
+          path: android/app/build/outputs/bundle/release/*.aab
+          retention-days: 30
+
+      # ── Attach to GitHub Release if triggered by a tag ────────────
+      - name: Upload APK to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
+            android/app/build/outputs/apk/debug/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

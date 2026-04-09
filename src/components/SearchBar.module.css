@@ -1,0 +1,59 @@
+.bar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 7px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  animation: slideDown 0.15s ease;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.input {
+  flex: 1;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 6px 10px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-family: var(--font-sans);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.input:focus { border-color: var(--accent); }
+.input::placeholder { color: var(--muted); }
+
+/* Hide browser default clear button */
+.input::-webkit-search-cancel-button { -webkit-appearance: none; }
+
+.count {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  min-width: 60px;
+  text-align: center;
+}
+
+.btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  padding: 4px 8px;
+  border-radius: var(--radius);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn:hover:not(:disabled) {
+  background: var(--panel);
+  color: var(--text);
+  border-color: var(--border);
+}
+.btn:disabled { opacity: 0.3; cursor: not-allowed; }

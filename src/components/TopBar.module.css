@@ -1,0 +1,101 @@
+.topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  height: 46px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+
+.logo {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.divider {
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 12px;
+  color: var(--muted);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  padding: 5px 9px;
+  border-radius: var(--radius);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+}
+.btn:hover {
+  background: var(--panel);
+  color: var(--text);
+  border-color: var(--border);
+}
+.btnActive {
+  background: var(--panel);
+  color: var(--accent);
+  border-color: rgba(79,195,247,0.35);
+}
+
+/* Focus mode exit bar */
+.focusBar {
+  position: fixed;
+  top: 12px;
+  right: 16px;
+  z-index: 200;
+}
+
+.exitFocus {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 6px 12px;
+  border-radius: var(--radius);
+  font-size: 11px;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  transition: all 0.15s;
+}
+.exitFocus:hover { color: var(--text); border-color: var(--muted); }
+
+.openBtn {
+  background: var(--accent) !important;
+  color: #000 !important;
+  border-color: transparent !important;
+  font-weight: 600;
+  padding: 5px 14px;
+}
+.openBtn:hover {
+  background: #81d4fa !important;
+  color: #000 !important;
+}

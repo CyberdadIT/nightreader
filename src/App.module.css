@@ -1,0 +1,82 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  height: 100dvh;            /* dynamic viewport height — accounts for mobile browser chrome */
+  overflow: hidden;
+  padding-top: var(--safe-top);
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── Loading overlay ─────────────────────────────────────────────── */
+.loadingOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: 13px;
+  z-index: 100;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 2.5px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Error box ───────────────────────────────────────────────────── */
+.errorBox {
+  margin: 24px auto;
+  max-width: 400px;
+  background: rgba(244, 112, 103, 0.1);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  text-align: center;
+  color: var(--danger);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.errorBox button {
+  background: transparent;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  padding: 5px 16px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  align-self: center;
+}
+.errorBox button:hover { background: rgba(244, 112, 103, 0.15); }
+
+/* ── Focus mode ──────────────────────────────────────────────────── */
+.focusMode .body { background: var(--bg); }

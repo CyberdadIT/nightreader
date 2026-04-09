@@ -1,0 +1,31 @@
+.viewer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+.canvas {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px 40px;
+  scroll-behavior: smooth;
+}
+
+.brightnessOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  transition: background 0.3s ease;
+}
+
+/* Focus / distraction-free mode */
+.focusMode .canvas {
+  padding: 40px 32px;
+}

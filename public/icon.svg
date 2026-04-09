@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="#0d1117"/>
+  <!-- Moon crescent -->
+  <path
+    d="M 310 100
+       A 140 140 0 1 0 310 412
+       A 100 100 0 1 1 310 100 Z"
+    fill="#4fc3f7"
+    opacity="0.92"
+  />
+  <!-- Book pages suggestion — subtle lines -->
+  <rect x="180" y="230" width="120" height="8" rx="4" fill="#4fc3f7" opacity="0.3"/>
+  <rect x="180" y="252" width="90"  height="8" rx="4" fill="#4fc3f7" opacity="0.2"/>
+  <rect x="180" y="274" width="110" height="8" rx="4" fill="#4fc3f7" opacity="0.25"/>
+</svg>

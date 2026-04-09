@@ -1,0 +1,54 @@
+# NightReader Winget Package Manifest
+# Submit this to https://github.com/microsoft/winget-pkgs to list NightReader
+# in the Windows Package Manager (winget) so users can install with:
+#   winget install NightReader.NightReader
+
+PackageIdentifier: NightReader.NightReader
+PackageVersion: 0.1.0
+PackageLocale: en-US
+Publisher: NightReader Contributors
+PublisherUrl: https://github.com/your-org/nightreader
+PublisherSupportUrl: https://github.com/your-org/nightreader/issues
+PrivacyUrl: https://github.com/your-org/nightreader/blob/main/PRIVACY.md
+Author: NightReader Contributors
+PackageName: NightReader
+PackageUrl: https://github.com/your-org/nightreader
+License: GPL-3.0
+LicenseUrl: https://github.com/your-org/nightreader/blob/main/LICENSE
+Copyright: Copyright © 2024 NightReader Contributors
+ShortDescription: Open-source night-mode PDF reader
+Description: |-
+  NightReader is a cross-platform, open-source PDF reader built for night owls.
+  Features include five reading modes (Dark, Light, Sepia, AMOLED, Matrix),
+  real PDF rendering via PDF.js, text selection, highlights in 4 colours,
+  annotations, bookmarks, table of contents, find-in-document search,
+  continuous scroll, focus mode, font switching, and persistent settings.
+  Built with Tauri for a fast, lightweight native Windows experience (~5 MB installer).
+Moniker: nightreader
+Tags:
+  - pdf
+  - reader
+  - dark-mode
+  - night-reader
+  - ebook
+  - open-source
+  - tauri
+ReleaseNotesUrl: https://github.com/your-org/nightreader/releases/tag/v0.1.0
+Installers:
+  - Architecture: x64
+    InstallerType: msi
+    InstallerUrl: https://github.com/your-org/nightreader/releases/download/v0.1.0/NightReader_0.1.0_x64_en-US.msi
+    InstallerSha256: REPLACE_WITH_ACTUAL_SHA256_AFTER_BUILDING
+    InstallerSwitches:
+      Silent: /quiet
+      SilentWithProgress: /passive
+    UpgradeBehavior: install
+  - Architecture: x64
+    InstallerType: nullsoft
+    InstallerUrl: https://github.com/your-org/nightreader/releases/download/v0.1.0/NightReader_0.1.0_x64-setup.exe
+    InstallerSha256: REPLACE_WITH_ACTUAL_SHA256_AFTER_BUILDING
+    InstallerSwitches:
+      Silent: /S
+    UpgradeBehavior: install
+ManifestType: singleton
+ManifestVersion: 1.6.0

@@ -1,0 +1,190 @@
+.sidebar {
+  width: 220px;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.tab {
+  flex: 1;
+  padding: 9px 4px;
+  font-size: 10px;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 0.3px;
+}
+
+.tab:hover { color: var(--text); }
+
+.tabActive {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+/* ── Thumbnails ──────────────────────────────────────────────────────── */
+.thumbGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.thumb {
+  border-radius: var(--radius);
+  border: 1.5px solid var(--border);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.thumb:hover { border-color: var(--muted); }
+.thumbActive { border-color: var(--accent) !important; }
+
+.thumbPreview {
+  background: #1a1f2a;
+  height: 110px;
+  display: flex;
+  align-items: center;
+  padding: 10px;
+}
+
+.thumbLines { width: 100%; }
+
+.thumbLine {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-bottom: 5px;
+}
+
+.thumbLabel {
+  display: block;
+  padding: 4px 0;
+  font-size: 10px;
+  color: var(--muted);
+  text-align: center;
+  background: var(--panel);
+  font-family: var(--font-mono);
+}
+
+/* ── Table of Contents ───────────────────────────────────────────────── */
+.toc { padding: 4px 0; }
+
+.tocItem {
+  padding: 6px 8px;
+  font-size: 11px;
+  color: var(--muted);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.15s;
+  border-left: 2px solid transparent;
+  line-height: 1.4;
+}
+
+.tocItem:hover { background: var(--panel); color: var(--text); }
+
+.tocActive {
+  color: var(--accent);
+  border-left-color: var(--accent);
+  background: rgba(79, 195, 247, 0.06);
+}
+
+/* ── Bookmarks ───────────────────────────────────────────────────────── */
+.bookmarkList { display: flex; flex-direction: column; gap: 4px; }
+
+.bookmark {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.bookmark:hover { border-color: var(--muted); }
+
+.bookmarkMain {
+  flex: 1;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+.bookmarkTitle {
+  display: block;
+  font-size: 11px;
+  color: var(--text);
+  margin-bottom: 2px;
+  line-height: 1.3;
+}
+
+.bookmarkPage {
+  display: block;
+  font-size: 10px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+
+.bookmarkDelete {
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+
+.bookmarkDelete:hover { color: var(--danger); }
+
+.empty {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.6;
+  padding: 4px;
+}
+
+.tocTitle {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tocPage {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--muted);
+  flex-shrink: 0;
+  margin-left: 6px;
+  opacity: 0.6;
+}
+
+.tocItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.tocNoLink {
+  cursor: default;
+  opacity: 0.5;
+}

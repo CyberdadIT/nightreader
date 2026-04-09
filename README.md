@@ -1,0 +1,235 @@
+# ☽ NightReader
+
+> An open-source, cross-platform PDF reader built for night owls.
+
+[![CI](https://github.com/your-org/nightreader/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/nightreader/actions/workflows/ci.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+
+---
+
+## Features
+
+- **5 reading modes** — Dark, Light, Sepia, AMOLED, Matrix (green)
+- **Real PDF rendering** via Mozilla PDF.js — fonts, images, vector graphics
+- **Selectable text** with text-layer overlay on every page
+- **Annotations** — highlight in 4 colours, underline, strikethrough, notes
+- **Bookmarks** — save and jump to any page
+- **Table of contents** — extracted from PDF outline
+- **Find in document** — full-text search with match highlighting
+- **Continuous scroll** or single-page mode
+- **Focus mode** — hides all chrome for distraction-free reading
+- **Fine display controls** — font size, line height, margins, brightness
+- **Font switching** — Serif, Sans, Monospace
+- **Drag and drop** PDF files
+- **Recent files** list
+- **Keyboard shortcuts** — full navigation without a mouse
+- **Persistent settings** — remembers your preferences between sessions
+
+---
+
+## Platform support
+
+| Platform | Technology     | Distribution                      |
+|----------|----------------|-----------------------------------|
+| Windows  | Tauri + React  | `.msi` / `.exe` via GitHub Releases |
+| Linux    | Tauri + React  | `.deb` / `.AppImage` / Flathub    |
+| macOS    | Tauri + React  | `.dmg` via GitHub Releases        |
+| Android  | Capacitor      | `.apk` via GitHub Releases / F-Droid |
+| iOS      | Capacitor      | `.ipa` sideload / AltStore        |
+
+---
+
+## Getting started
+
+### Prerequisites
+
+- [Node.js](https://nodejs.org) 20+
+- [Rust](https://rustup.rs) stable (for desktop builds)
+- [Android Studio](https://developer.android.com/studio) (for Android builds)
+- [Xcode](https://developer.apple.com/xcode/) 15+ on macOS (for iOS builds)
+
+### Install dependencies
+
+```bash
+git clone https://github.com/your-org/nightreader.git
+cd nightreader
+npm install
+```
+
+### Run in the browser (development)
+
+```bash
+npm run dev
+# Open http://localhost:1420
+```
+
+### Run as a desktop app (Tauri)
+
+```bash
+npm run tauri:dev
+```
+
+### Build desktop installers
+
+```bash
+npm run tauri:build
+# Output: src-tauri/target/release/bundle/
+```
+
+### Run on Android
+
+```bash
+# First build the frontend and sync
+npm run build
+npm run cap:sync
+
+# Open in Android Studio
+npm run cap:android
+
+# Or build an APK directly
+cd android && ./gradlew assembleDebug
+```
+
+### Run on iOS
+
+```bash
+npm run build
+npm run cap:sync
+
+# Open in Xcode
+npm run cap:ios
+```
+
+---
+
+## Project structure
+
+```
+nightreader/
+├── src/                        # React frontend
+│   ├── components/             # UI components
+│   │   ├── App.jsx             # Root component
+│   │   ├── TopBar.jsx          # Header with logo and panel toggles
+│   │   ├── Toolbar.jsx         # Page nav, zoom, tool buttons
+│   │   ├── SearchBar.jsx       # Find-in-document bar
+│   │   ├── Sidebar.jsx         # Page thumbnails, TOC, bookmarks
+│   │   ├── Viewer.jsx          # Scrollable PDF canvas area
+│   │   ├── PdfPage.jsx         # Single page renderer (canvas + text layer)
+│   │   ├── SettingsPanel.jsx   # Display settings + annotations list
+│   │   ├── StatusBar.jsx       # Bottom status strip
+│   │   └── WelcomeScreen.jsx   # Empty state / recent files
+│   ├── hooks/
+│   │   ├── usePdfDocument.js   # PDF.js document loader
+│   │   └── useKeyboardShortcuts.js
+│   ├── store/
+│   │   └── useStore.js         # Zustand global state (persisted)
+│   ├── utils/
+│   │   └── platform.js         # Tauri / Capacitor / browser detection
+│   ├── styles/
+│   │   └── global.css          # Design tokens and reset
+│   └── main.jsx                # React entry point
+│
+├── src-tauri/                  # Tauri Rust backend (desktop)
+│   ├── src/
+│   │   ├── main.rs
+│   │   └── lib.rs              # Plugin registration, custom commands
+│   ├── migrations/
+│   │   └── 001_init.sql        # SQLite schema
+│   ├── icons/                  # App icons (add your own)
+│   ├── tauri.conf.json         # Tauri configuration
+│   └── Cargo.toml
+│
+├── android/                    # Capacitor Android project
+│   └── app/
+│       └── src/main/
+│           ├── java/com/nightreader/app/MainActivity.java
+│           ├── AndroidManifest.xml
+│           └── res/values/strings.xml
+│
+├── ios/                        # Capacitor iOS project (generated by cap add ios)
+│   └── Info.plist
+│
+├── .github/workflows/
+│   ├── ci.yml                  # Lint + test on every PR
+│   ├── build-desktop.yml       # Tauri builds for Windows, Linux, macOS
+│   ├── build-android.yml       # Capacitor Android APK + AAB
+│   └── build-ios.yml           # Capacitor iOS IPA
+│
+├── capacitor.config.ts         # Capacitor configuration
+├── vite.config.js              # Vite bundler configuration
+├── package.json
+└── README.md
+```
+
+---
+
+## Keyboard shortcuts
+
+| Key | Action |
+|---|---|
+| `← / →` | Previous / Next page |
+| `PageUp / PageDown` | Previous / Next page |
+| `Space` | Next page |
+| `+ / −` | Zoom in / out |
+| `Ctrl + 0` | Reset zoom |
+| `Ctrl + F` | Find in document |
+| `R` | Toggle focus mode |
+| `Esc` | Close search / exit focus mode |
+
+---
+
+## Releasing a new version
+
+1. Bump the version in `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`
+2. Commit and push to `main`
+3. Create and push a version tag:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+GitHub Actions automatically:
+- Builds Windows `.msi` + `.exe`, Linux `.deb` + `.AppImage`, macOS `.dmg`
+- Builds Android debug `.apk` and release `.aab`
+- Creates a **draft** GitHub Release with all artifacts attached
+
+Review the draft release on GitHub, add release notes, and publish.
+
+---
+
+## Contributing
+
+Pull requests are very welcome. Please open an issue first to discuss major changes.
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/my-feature`
+3. Commit your changes: `git commit -m 'feat: add my feature'`
+4. Push and open a PR
+
+### Commit convention
+
+We use [Conventional Commits](https://www.conventionalcommits.org/):
+- `feat:` new feature
+- `fix:` bug fix
+- `docs:` documentation only
+- `style:` formatting, no logic change
+- `refactor:` code change with no feature/fix
+- `chore:` build system, deps
+
+---
+
+## Licence
+
+[GNU General Public License v3.0](LICENSE) — free to use, modify, and distribute.
+All forks and derivatives must also be open source under the same licence.
+
+---
+
+## Acknowledgements
+
+- [PDF.js](https://mozilla.github.io/pdf.js/) — Mozilla's PDF rendering engine
+- [Tauri](https://tauri.app) — lightweight Rust-based desktop shell
+- [Capacitor](https://capacitorjs.com) — Ionic's native mobile bridge
+- [Zustand](https://github.com/pmndrs/zustand) — minimal React state management
+- Inspired by [Readera](https://readera.org) and [Foxit Reader](https://www.foxit.com)
