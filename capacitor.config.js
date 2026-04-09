@@ -1,14 +1,9 @@
-import { CapacitorConfig } from "@capacitor/cli";
-
-const config: CapacitorConfig = {
+const config = {
   appId: "com.nightreader.app",
   appName: "NightReader",
   webDir: "dist",
   server: {
     androidScheme: "https",
-    // Uncomment during development to use live reload:
-    // url: "http://YOUR_LOCAL_IP:1420",
-    // cleartext: true,
   },
   ios: {
     contentInset: "automatic",
@@ -37,4 +32,4 @@ const config: CapacitorConfig = {
   },
 };
 
-export default config;
+module.exports = config;

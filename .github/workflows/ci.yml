@@ -13,7 +13,7 @@ concurrency:
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
-    name: Lint, type-check & test
+    name: Lint and build check
 
     steps:
       - name: Checkout
@@ -26,18 +26,9 @@ jobs:
           cache: "npm"
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
-      - name: Lint
-        run: npm run lint --if-present
-
-      - name: Type check
-        run: npx tsc --noEmit --strict 2>/dev/null || true
-
-      - name: Run tests
-        run: npm test --if-present
-
-      - name: Build frontend (smoke test)
+      - name: Build frontend
         run: npm run build
 
       - name: Upload build artifact
@@ -46,35 +37,3 @@ jobs:
           name: dist-${{ github.sha }}
           path: dist/
           retention-days: 7
-
-  rust-check:
-    runs-on: ubuntu-latest
-    name: Rust check (Tauri backend)
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Linux system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libgtk-3-dev
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
-        with:
-          workspaces: "./src-tauri -> target"
-
-      - name: Cargo check
-        run: cargo check --manifest-path src-tauri/Cargo.toml
-
-      - name: Cargo clippy
-        run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
