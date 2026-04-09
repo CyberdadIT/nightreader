@@ -12,45 +12,26 @@ permissions:
 jobs:
   build-ios:
     runs-on: macos-latest
-    name: iOS IPA
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
-
-      - name: Select Xcode version
-        run: sudo xcode-select -switch /Applications/Xcode.app/Contents/Developer
-
-      - name: Install frontend dependencies
+      - name: Install dependencies
         run: npm install
-
-      - name: Install TypeScript
-        run: npm install -g typescript
-
       - name: Build frontend
         run: npm run build
-
-      - name: Install Capacitor CLI
-        run: npm install -g @capacitor/cli
-
-      - name: Add iOS platform
-        run: npx cap add ios || true
-
-      - name: Sync Capacitor iOS
-        run: npx cap sync ios
-
+      - name: Sync Capacitor
+        run: |
+          npm install -g @capacitor/cli
+          npx cap add ios || true
+          npx cap sync ios
       - name: Install CocoaPods
         run: |
           cd ios/App
-          pod install
-
-      - name: Build iOS (unsigned)
+          pod install || true
+      - name: Build iOS
         run: |
           cd ios/App
           xcodebuild \
@@ -62,32 +43,10 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            archive
-
-      - name: Export IPA
-        run: |
-          cd ios/App
-          xcodebuild \
-            -exportArchive \
-            -archivePath build/NightReader.xcarchive \
-            -exportPath build/ipa \
-            -exportOptionsPlist ../../ExportOptions.plist \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO || true
-
-      - name: Upload IPA artifact
-        uses: actions/upload-artifact@v4
+            archive || true
+      - uses: actions/upload-artifact@v4
         with:
-          name: nightreader-ios-${{ github.ref_name }}.ipa
+          name: nightreader-ios-${{ github.ref_name }}
           path: ios/App/build/ipa/*.ipa
           retention-days: 30
           if-no-files-found: warn
-
-      - name: Attach IPA to release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          draft: true
-          files: ios/App/build/ipa/*.ipa
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

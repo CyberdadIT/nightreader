@@ -21,30 +21,20 @@ jobs:
           - platform: ubuntu-22.04
             args: ""
             label: "Linux x64"
-
     runs-on: ${{ matrix.platform }}
     name: ${{ matrix.label }}
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-pc-windows-msvc
-
-      - name: Rust cache
-        uses: swatinem/rust-cache@v2
+      - uses: swatinem/rust-cache@v2
         with:
           workspaces: "./src-tauri -> target"
-
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
         run: |
@@ -57,18 +47,15 @@ jobs:
             libglib2.0-dev \
             libsoup-3.0-dev \
             libjavascriptcoregtk-4.1-dev
-
-      - name: Install frontend dependencies
+      - name: Install dependencies
         run: npm install
-
-      - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: "NightReader ${{ github.ref_name }}"
-          releaseBody: "NightReader ${{ github.ref_name }} — cross-platform PDF reader with dark mode."
+          releaseBody: "NightReader — open-source PDF reader with dark mode."
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
