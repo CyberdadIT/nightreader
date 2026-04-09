@@ -6,6 +6,9 @@ on:
       - "v*"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build-android:
     runs-on: ubuntu-latest
@@ -42,6 +45,9 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
 
+      - name: Install TypeScript
+        run: npm install -g typescript
+
       - name: Build frontend
         run: npm run build
 
@@ -60,7 +66,7 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: nightreader-android-${{ github.ref_name }}.apk
