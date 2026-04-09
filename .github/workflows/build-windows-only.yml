@@ -19,24 +19,24 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
     name: Windows x64 (.msi + .exe)
 
     steps:
-      # ── Checkout ────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── Node.js ─────────────────────────────────────────────────────
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
 
-      # ── Rust MSVC ───────────────────────────────────────────────────
       - name: Setup Rust stable (MSVC)
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -47,115 +47,27 @@ jobs:
         with:
           workspaces: "./src-tauri -> target"
 
-      # ── Frontend ────────────────────────────────────────────────────
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install
 
-      # ── Build ───────────────────────────────────────────────────────
-      - name: Build Windows installer (release)
-        if: ${{ github.event.inputs.build_type != 'debug' }}
+      - name: Build Windows installer
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Code signing — add these secrets in your repo settings
-          # TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          # TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName:       ${{ github.ref_name }}
-          releaseName:   "NightReader ${{ github.ref_name }} — Windows"
-          releaseBody:   |
-            ## NightReader ${{ github.ref_name }} for Windows
+          tagName: ${{ github.ref_name }}
+          releaseName: "NightReader ${{ github.ref_name }}"
+          releaseBody: |
+            ## NightReader ${{ github.ref_name }}
 
-            ### Installation
-            1. Download `NightReader_x.x.x_x64_en-US.msi` or `NightReader_x.x.x_x64-setup.exe`
-            2. Double-click to install
-            3. Launch from Start Menu or Desktop shortcut
+            Open-source PDF reader with dark mode, annotations, bookmarks and more.
 
-            **System requirements:** Windows 10 version 1803+ or Windows 11
+            ### Download
+            - **Windows installer (.msi)** — recommended
+            - **Windows setup wizard (.exe)** — alternative
+            - **Portable .exe** — no install needed
 
-            > If Windows Defender SmartScreen warns about the installer,
-            > click **"More info" → "Run anyway"**. This is expected for
-            > unsigned open-source apps.
-          releaseDraft:  true
-          prerelease:    false
+            > If Windows SmartScreen warns you, click More info then Run anyway.
+          releaseDraft: true
+          prerelease: false
           args: "--target x86_64-pc-windows-msvc --config src-tauri/tauri.windows.conf.json"
-
-      - name: Build Windows installer (debug)
-        if: ${{ github.event.inputs.build_type == 'debug' }}
-        run: npm run tauri:build -- --debug --target x86_64-pc-windows-msvc
-
-      # ── Upload artifacts (also available without a tag) ─────────────
-      - name: Upload MSI artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: NightReader-Windows-${{ github.ref_name }}-x64.msi
-          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
-          retention-days: 90
-          if-no-files-found: warn
-
-      - name: Upload NSIS artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: NightReader-Windows-${{ github.ref_name }}-x64-setup.exe
-          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-          retention-days: 90
-          if-no-files-found: warn
-
-      - name: Upload portable EXE artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: NightReader-Windows-${{ github.ref_name }}-portable.exe
-          path: src-tauri/target/x86_64-pc-windows-msvc/release/NightReader.exe
-          retention-days: 90
-          if-no-files-found: warn
-
-  # ── Winget package manifest (auto-generated after release) ──────────
-  winget-manifest:
-    needs: build-windows
-    runs-on: windows-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    name: Generate Winget manifest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Generate Winget manifest
-        run: |
-          $version = "${{ github.ref_name }}".TrimStart('v')
-          $manifestDir = "winget-manifests\c\NightReader\NightReader\$version"
-          New-Item -ItemType Directory -Force -Path $manifestDir
-
-          $manifest = @"
-          PackageIdentifier: NightReader.NightReader
-          PackageVersion: $version
-          PackageLocale: en-US
-          Publisher: NightReader Contributors
-          PackageName: NightReader
-          License: GPL-3.0
-          ShortDescription: Open-source night-mode PDF reader
-          Description: NightReader is a cross-platform, open-source PDF reader with advanced dark mode, rich annotations, bookmarks, and distraction-free reading. Built with Tauri for a fast, native Windows experience.
-          PackageUrl: https://github.com/${{ github.repository }}
-          ReleaseNotesUrl: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
-          Tags:
-            - pdf
-            - reader
-            - dark-mode
-            - night-mode
-            - ebook
-          Installers:
-            - Architecture: x64
-              InstallerType: msi
-              InstallerUrl: https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/NightReader_${version}_x64_en-US.msi
-              InstallerSha256: TO_BE_FILLED
-          ManifestType: singleton
-          ManifestVersion: 1.6.0
-          "@
-          $manifest | Out-File "$manifestDir\NightReader.NightReader.yaml" -Encoding UTF8
-
-      - name: Upload Winget manifest
-        uses: actions/upload-artifact@v4
-        with:
-          name: winget-manifest-${{ github.ref_name }}
-          path: winget-manifests/
-          retention-days: 90
