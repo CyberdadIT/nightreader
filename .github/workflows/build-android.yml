@@ -28,10 +28,7 @@ jobs:
       - name: Build frontend
         run: npm run build
       - name: Sync Capacitor
-        run: |
-          npm install -g @capacitor/cli
-          npx cap add android || true
-          npx cap sync android
+        run: npx cap sync android
       - name: Build APK
         run: |
           cd android
