@@ -1,4 +1,4 @@
-const config = {
+module.exports = {
   appId: "com.nightreader.app",
   appName: "NightReader",
   webDir: "dist",
@@ -20,9 +20,6 @@ const config = {
     SplashScreen: {
       launchShowDuration: 800,
       backgroundColor: "#0d1117",
-      androidSplashResourceName: "splash",
-      androidScaleType: "CENTER_CROP",
-      showSpinner: false,
     },
     StatusBar: {
       style: "Dark",
@@ -31,5 +28,3 @@ const config = {
     },
   },
 };
-
-module.exports = config;
