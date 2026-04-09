@@ -1,15 +1,15 @@
 import { useEffect } from "react";
 import { useStore } from "../store/useStore.js";
 
-/**
- * Global keyboard shortcuts for NightReader.
- * Only active when no text input is focused.
- */
+const ZOOM_STEPS = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0];
+
 export function useKeyboardShortcuts({ onNextPage, onPrevPage }) {
-  const toggleSearch = useStore((s) => s.toggleSearch);
+  const toggleSearch    = useStore((s) => s.toggleSearch);
   const toggleFocusMode = useStore((s) => s.toggleFocusMode);
-  const setZoom = useStore((s) => s.setZoom);
-  const zoom = useStore((s) => s.zoom);
+  const setZoom         = useStore((s) => s.setZoom);
+  const zoom            = useStore((s) => s.zoom);
+  const searchVisible   = useStore((s) => s.searchVisible);
+  const toggleSearch2   = useStore((s) => s.toggleSearch);
 
   useEffect(() => {
     const handler = (e) => {
@@ -20,42 +20,43 @@ export function useKeyboardShortcuts({ onNextPage, onPrevPage }) {
         case "ArrowRight":
         case "ArrowDown":
         case "PageDown":
-        case " ":
-          e.preventDefault();
-          onNextPage?.();
+          if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); onNextPage?.(); }
           break;
         case "ArrowLeft":
         case "ArrowUp":
         case "PageUp":
+          if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); onPrevPage?.(); }
+          break;
+        case " ":
           e.preventDefault();
-          onPrevPage?.();
+          onNextPage?.();
           break;
         case "f":
         case "F":
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            toggleSearch();
-          }
+          if (e.ctrlKey || e.metaKey) { e.preventDefault(); toggleSearch(); }
           break;
         case "r":
         case "R":
-          toggleFocusMode();
+          if (!e.ctrlKey && !e.metaKey) toggleFocusMode();
           break;
         case "+":
-        case "=":
-          setZoom(zoom + 0.1);
+        case "=": {
+          // Zoom in to next step
+          const next = ZOOM_STEPS.find((s) => s > zoom + 0.01);
+          setZoom(next ?? ZOOM_STEPS[ZOOM_STEPS.length - 1]);
           break;
-        case "-":
-          setZoom(zoom - 0.1);
+        }
+        case "-": {
+          // Zoom out to previous step
+          const prev = [...ZOOM_STEPS].reverse().find((s) => s < zoom - 0.01);
+          setZoom(prev ?? ZOOM_STEPS[0]);
           break;
+        }
         case "0":
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            setZoom(1.0);
-          }
+          if (e.ctrlKey || e.metaKey) { e.preventDefault(); setZoom(1.0); }
           break;
         case "Escape":
-          // Handled by individual components
+          if (searchVisible) toggleSearch2();
           break;
         default:
           break;
@@ -64,5 +65,5 @@ export function useKeyboardShortcuts({ onNextPage, onPrevPage }) {
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onNextPage, onPrevPage, toggleSearch, toggleFocusMode, setZoom, zoom]);
+  }, [onNextPage, onPrevPage, toggleSearch, toggleFocusMode, setZoom, zoom, searchVisible, toggleSearch2]);
 }

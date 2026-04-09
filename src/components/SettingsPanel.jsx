@@ -25,7 +25,8 @@ export default function SettingsPanel({ onClose }) {
   const brightness   = useStore((s) => s.brightness);
   const hlColor      = useStore((s) => s.hlColor);
   const annotations  = useStore((s) => s.annotations);
-  const filePath     = useStore((s) => s.filePath);
+  const activeTab = useStore((s) => s.getActiveTab());
+  const filePath = activeTab?.path ?? null;
   const invertColors = useStore((s) => s.invertColors);
 
   const setReadingMode   = useStore((s) => s.setReadingMode);

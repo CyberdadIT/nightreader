@@ -118,3 +118,41 @@
   color: #000;
   border-color: transparent;
 }
+
+/* ── Zoom controls ──────────────────────────────────────────────────── */
+.zoomBtn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+  padding: 4px 10px;
+  border-radius: var(--radius);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-sans);
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.zoomBtn:hover:not(:disabled) {
+  background: var(--panel);
+  color: var(--accent);
+  border-color: var(--border);
+}
+.zoomBtn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.zoomSelect {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  outline: none;
+  min-width: 64px;
+  text-align: center;
+}
+.zoomSelect:focus { border-color: var(--accent); }
+.zoomSelect option { background: var(--surface); color: var(--text); }

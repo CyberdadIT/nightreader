@@ -1,57 +1,77 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useStore } from "../store/useStore.js";
 import styles from "./Sidebar.module.css";
+import * as pdfjsLib from "pdfjs-dist";
 
 const TABS = ["Pages", "Contents", "Bookmarks"];
 
 export default function Sidebar({ pdf, outline }) {
-  const [tab, setTab] = useState(0);
-  const [resolvedOutline, setResolvedOutline] = useState([]);
+  const [tab, setTab]                   = useState(0);
+  const [resolvedOutline, setResolved]  = useState([]);
+  const [thumbnails, setThumbnails]     = useState({});
+  const thumbCanvasRef                  = useRef({});
 
-  const currentPage    = useStore((s) => s.currentPage);
-  const totalPages     = useStore((s) => s.totalPages);
+  const activeTab      = useStore((s) => s.getActiveTab());
+  const currentPage    = activeTab?.page ?? 1;
+  const totalPages     = activeTab?.totalPages ?? 0;
   const bookmarks      = useStore((s) => s.bookmarks);
-  const filePath       = useStore((s) => s.filePath);
+  const filePath       = activeTab?.path ?? null;
   const setCurrentPage = useStore((s) => s.setCurrentPage);
   const removeBookmark = useStore((s) => s.removeBookmark);
 
   const fileBookmarks = bookmarks.filter((b) => b.filePath === filePath);
 
-  // Resolve PDF.js outline destinations to actual page numbers
+  // ── Resolve TOC destinations to page numbers ──────────────────────────
   useEffect(() => {
-    if (!pdf || !outline || outline.length === 0) {
-      setResolvedOutline([]);
-      return;
-    }
-
+    if (!pdf || !outline || outline.length === 0) { setResolved([]); return; }
     async function resolveItem(item) {
       let pageNum = null;
       try {
         if (item.dest) {
           let dest = item.dest;
-          // dest can be a string (named dest) or array (explicit dest)
-          if (typeof dest === "string") {
-            dest = await pdf.getDestination(dest);
-          }
+          if (typeof dest === "string") dest = await pdf.getDestination(dest);
           if (Array.isArray(dest) && dest[0]) {
-            const pageRef = dest[0];
-            const pageIndex = await pdf.getPageIndex(pageRef);
-            pageNum = pageIndex + 1; // convert 0-based to 1-based
+            const idx = await pdf.getPageIndex(dest[0]);
+            pageNum = idx + 1;
           }
         }
-      } catch (e) {
-        // silently ignore unresolvable destinations
-      }
-
+      } catch {}
       const children = item.items
         ? await Promise.all(item.items.map(resolveItem))
         : [];
-
       return { title: item.title, page: pageNum, items: children };
     }
-
-    Promise.all(outline.map(resolveItem)).then(setResolvedOutline);
+    Promise.all(outline.map(resolveItem)).then(setResolved);
   }, [pdf, outline]);
+
+  // ── Render page thumbnails ────────────────────────────────────────────
+  useEffect(() => {
+    if (!pdf || tab !== 0) return;
+    let cancelled = false;
+
+    async function renderThumbs() {
+      const scale = 0.2; // small thumbnails
+      for (let i = 1; i <= Math.min(totalPages, 50); i++) {
+        if (cancelled) break;
+        if (thumbnails[i]) continue; // already rendered
+        try {
+          const page = await pdf.getPage(i);
+          const vp   = page.getViewport({ scale });
+          const canvas = document.createElement("canvas");
+          canvas.width  = Math.floor(vp.width);
+          canvas.height = Math.floor(vp.height);
+          const ctx = canvas.getContext("2d");
+          await page.render({ canvasContext: ctx, viewport: vp }).promise;
+          if (!cancelled) {
+            setThumbnails((prev) => ({ ...prev, [i]: canvas.toDataURL("image/jpeg", 0.7) }));
+          }
+        } catch {}
+      }
+    }
+
+    renderThumbs();
+    return () => { cancelled = true; };
+  }, [pdf, tab, totalPages]);
 
   return (
     <aside className={styles.sidebar} aria-label="Document sidebar">
@@ -70,10 +90,13 @@ export default function Sidebar({ pdf, outline }) {
       </div>
 
       <div className={styles.content} role="tabpanel">
+
+        {/* ── Page thumbnails ─────────────────────────────────────────── */}
         {tab === 0 && (
           <div className={styles.thumbGrid}>
             {Array.from({ length: totalPages }, (_, i) => {
               const n = i + 1;
+              const thumb = thumbnails[n];
               return (
                 <div
                   key={n}
@@ -83,11 +106,21 @@ export default function Sidebar({ pdf, outline }) {
                   aria-label={`Go to page ${n}`}
                 >
                   <div className={styles.thumbPreview}>
-                    <div className={styles.thumbLines}>
-                      {[100, 70, 85, 100, 60, 80, 90, 65].map((w, j) => (
-                        <div key={j} className={styles.thumbLine} style={{ width: `${w}%` }} />
-                      ))}
-                    </div>
+                    {thumb ? (
+                      <img
+                        src={thumb}
+                        alt={`Page ${n}`}
+                        style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
+                      />
+                    ) : (
+                      <div className={styles.thumbPlaceholder}>
+                        <div className={styles.thumbLines}>
+                          {[100,70,85,100,60,80,90,65].map((w,j) => (
+                            <div key={j} className={styles.thumbLine} style={{ width: `${w}%` }} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <span className={styles.thumbLabel}>{n}</span>
                 </div>
@@ -96,6 +129,7 @@ export default function Sidebar({ pdf, outline }) {
           </div>
         )}
 
+        {/* ── Table of Contents ────────────────────────────────────────── */}
         {tab === 1 && (
           <div className={styles.toc}>
             {resolvedOutline.length > 0 ? (
@@ -109,14 +143,15 @@ export default function Sidebar({ pdf, outline }) {
               ))
             ) : (
               <p className={styles.empty}>
-                {outline && outline.length > 0
-                  ? "Resolving table of contents…"
+                {outline?.length > 0
+                  ? "Resolving contents…"
                   : "No table of contents in this document."}
               </p>
             )}
           </div>
         )}
 
+        {/* ── Bookmarks ────────────────────────────────────────────────── */}
         {tab === 2 && (
           <div className={styles.bookmarkList}>
             {fileBookmarks.length > 0 ? (
@@ -144,6 +179,7 @@ export default function Sidebar({ pdf, outline }) {
             )}
           </div>
         )}
+
       </div>
     </aside>
   );
@@ -152,7 +188,6 @@ export default function Sidebar({ pdf, outline }) {
 function TocItem({ item, currentPage, onNavigate, depth = 0 }) {
   const isActive = item.page === currentPage;
   const hasPage  = item.page !== null && item.page !== undefined;
-
   return (
     <>
       <div
@@ -163,18 +198,10 @@ function TocItem({ item, currentPage, onNavigate, depth = 0 }) {
         title={hasPage ? `Go to page ${item.page}` : item.title}
       >
         <span className={styles.tocTitle}>{item.title}</span>
-        {hasPage && (
-          <span className={styles.tocPage}>{item.page}</span>
-        )}
+        {hasPage && <span className={styles.tocPage}>{item.page}</span>}
       </div>
       {item.items?.map((child, i) => (
-        <TocItem
-          key={i}
-          item={child}
-          currentPage={currentPage}
-          onNavigate={onNavigate}
-          depth={depth + 1}
-        />
+        <TocItem key={i} item={child} currentPage={currentPage} onNavigate={onNavigate} depth={depth + 1} />
       ))}
     </>
   );
