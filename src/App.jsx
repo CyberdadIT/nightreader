@@ -11,7 +11,7 @@ import SettingsPanel from "./components/SettingsPanel.jsx";
 import StatusBar     from "./components/StatusBar.jsx";
 import WelcomeScreen from "./components/WelcomeScreen.jsx";
 
-import { useStore } from "./store/useStore.js";
+import { useStore, savePdfData, loadPdfData } from "./store/useStore.js";
 import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts.js";
 import styles from "./App.module.css";
 
@@ -21,77 +21,160 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 ).toString();
 
 export default function App() {
-  const [sidebarOpen,  setSidebarOpen]  = useState(true);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [loadError,    setLoadError]    = useState(null);
-  const [loading,      setLoading]      = useState(false);
+  const [sidebarOpen,    setSidebarOpen]    = useState(true);
+  const [settingsOpen,   setSettingsOpen]   = useState(false);
+  const [loadError,      setLoadError]      = useState(null);
+  const [loading,        setLoading]        = useState(false);
+  const [sessionLoading, setSessionLoading] = useState(true);
 
-  // All loaded PDF documents keyed by tab id
-  const pdfDocsRef = useRef({});
+  const pdfDocsRef     = useRef({});
+  const hasRestoredRef = useRef(false);
 
-  const tabs           = useStore((s) => s.tabs);
-  const activeTabId    = useStore((s) => s.activeTabId);
-  const activeTab      = useStore((s) => s.getActiveTab());
-  const openTab        = useStore((s) => s.openTab);
-  const updateTab      = useStore((s) => s.updateTab);
-  const closeTab       = useStore((s) => s.closeTab);
-  const addRecentFile  = useStore((s) => s.addRecentFile);
+  const tabs                 = useStore((s) => s.tabs);
+  const activeTabId          = useStore((s) => s.activeTabId);
+  const activeTab            = useStore((s) => s.getActiveTab());
+  const openTab              = useStore((s) => s.openTab);
+  const updateTab            = useStore((s) => s.updateTab);
+  const setActiveTab         = useStore((s) => s.setActiveTab);
+  const addRecentFile        = useStore((s) => s.addRecentFile);
   const updateRecentFilePage = useStore((s) => s.updateRecentFilePage);
-  const setCurrentPage = useStore((s) => s.setCurrentPage);
-  const focusMode      = useStore((s) => s.focusMode);
+  const setCurrentPage       = useStore((s) => s.setCurrentPage);
+  const focusMode            = useStore((s) => s.focusMode);
 
-  // Active PDF document object
-  const activePdf = activeTabId ? pdfDocsRef.current[activeTabId] : null;
+  const activePdf     = activeTabId ? pdfDocsRef.current[activeTabId] : null;
   const activeOutline = activeTab?.outline ?? [];
 
-  // ── Load a PDF file into a new or existing tab ───────────────────────
+  // ── Safe copy — prevents ArrayBuffer detachment issues ───────────────
+  function safeCopy(data) {
+    if (data instanceof Uint8Array) {
+      // Copy the underlying buffer so original stays valid
+      const copy = new Uint8Array(data.length);
+      copy.set(data);
+      return copy;
+    }
+    if (data instanceof ArrayBuffer) {
+      return new Uint8Array(data.slice(0));
+    }
+    if (data && typeof data === "object" && !ArrayBuffer.isView(data)) {
+      const vals = Object.values(data);
+      if (vals.length > 0 && typeof vals[0] === "number") {
+        return new Uint8Array(vals);
+      }
+    }
+    return null;
+  }
+
+  // ── Load PDF bytes into a tab ─────────────────────────────────────────
+  const loadPdfIntoTab = useCallback(async (tabId, rawData) => {
+    // Always work with a fresh copy to avoid detachment
+    const bytes = safeCopy(rawData);
+    if (!bytes) throw new Error("Invalid PDF data format");
+
+    const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
+    pdfDocsRef.current[tabId] = doc;
+    updateTab(tabId, { totalPages: doc.numPages });
+
+    try {
+      const ol = await doc.getOutline();
+      updateTab(tabId, { outline: ol ?? [] });
+    } catch {
+      updateTab(tabId, { outline: [] });
+    }
+
+    return doc;
+  }, [updateTab]);
+
+  // ── Open PDF (user initiated) ─────────────────────────────────────────
   const loadPdf = useCallback(async (file) => {
     if (!file?.data) return;
     setLoading(true);
     setLoadError(null);
     try {
-      const doc = await pdfjsLib.getDocument({ data: file.data }).promise;
-      const id  = openTab(file);
+      // Switch to existing tab if already open
+      const existing = useStore.getState().tabs.find((t) => t.path === file.path);
+      if (existing && pdfDocsRef.current[existing.id]) {
+        setActiveTab(existing.id);
+        setLoading(false);
+        return;
+      }
 
-      // Store the live pdfjs document object (not serialisable, kept in ref)
-      pdfDocsRef.current[id] = doc;
+      // Make a copy BEFORE anything else touches the ArrayBuffer
+      const dataCopy = safeCopy(file.data);
+      if (!dataCopy) throw new Error("Could not read PDF data");
 
-      // Update tab metadata
-      updateTab(id, { totalPages: doc.numPages, page: 1, pdfDoc: null });
+      const id = openTab(file);
 
-      // Add to recent files
+      // Load into PDF.js using a fresh copy
+      await loadPdfIntoTab(id, safeCopy(dataCopy));
+
+      // Save a separate copy to IndexedDB for session restore
+      await savePdfData(file.path, safeCopy(dataCopy));
+
       addRecentFile({
         path:     file.path,
         name:     file.name,
         date:     new Date().toLocaleDateString(),
         lastPage: 1,
-        data:     file.data, // keep data for reopening from recent list
       });
-
-      // Load TOC outline
-      try {
-        const ol = await doc.getOutline();
-        updateTab(id, { outline: ol ?? [] });
-      } catch {
-        updateTab(id, { outline: [] });
-      }
     } catch (err) {
       setLoadError(err.message ?? "Could not open this PDF.");
     } finally {
       setLoading(false);
     }
-  }, [openTab, updateTab, addRecentFile]);
+  }, [openTab, loadPdfIntoTab, addRecentFile, setActiveTab]);
 
-  // ── When active tab changes, restore reading position ─────────────────
-  // (position is already saved in the tab object, nothing extra needed)
+  // ── Session restore on startup ────────────────────────────────────────
+  useEffect(() => {
+    if (hasRestoredRef.current) return;
+    hasRestoredRef.current = true;
 
-  // ── Save reading position when page changes ────────────────────────────
+    async function restoreSession() {
+      const savedTabs = useStore.getState().tabs;
+      if (savedTabs.length === 0) { setSessionLoading(false); return; }
+
+      let anyRestored = false;
+
+      for (const tab of savedTabs) {
+        try {
+          const stored = await loadPdfData(tab.path);
+          if (!stored) continue;
+
+          // Make a fresh copy from storage
+          const bytes = safeCopy(stored);
+          if (!bytes) continue;
+
+          // Validate it's actually a PDF (%PDF header)
+          if (bytes[0] !== 0x25 || bytes[1] !== 0x50) continue;
+
+          // Load using yet another copy so storage data stays intact
+          await loadPdfIntoTab(tab.id, safeCopy(bytes));
+          anyRestored = true;
+        } catch (err) {
+          console.warn(`Could not restore "${tab.name}":`, err);
+        }
+      }
+
+      // Clean up tabs that couldn't be restored
+      const currentTabs = useStore.getState().tabs;
+      for (const tab of currentTabs) {
+        if (!pdfDocsRef.current[tab.id]) {
+          useStore.getState().closeTab(tab.id);
+        }
+      }
+
+      setSessionLoading(false);
+    }
+
+    restoreSession();
+  }, [loadPdfIntoTab]);
+
+  // ── Save reading position ─────────────────────────────────────────────
   useEffect(() => {
     if (!activeTab) return;
     updateRecentFilePage(activeTab.path, activeTab.page);
   }, [activeTab?.page, activeTab?.path]);
 
-  // ── Clean up closed tab PDF docs from memory ──────────────────────────
+  // ── Clean up closed docs ──────────────────────────────────────────────
   useEffect(() => {
     const activeIds = new Set(tabs.map((t) => t.id));
     Object.keys(pdfDocsRef.current).forEach((id) => {
@@ -106,10 +189,9 @@ export default function App() {
   useEffect(() => {
     async function onDrop(e) {
       e.preventDefault();
-      const files = Array.from(e.dataTransfer?.files ?? []);
-      for (const file of files) {
+      for (const file of Array.from(e.dataTransfer?.files ?? [])) {
         const data = await file.arrayBuffer();
-        loadPdf({ path: file.name, name: file.name, data });
+        await loadPdf({ path: file.name, name: file.name, data });
       }
     }
     function onDragOver(e) { e.preventDefault(); }
@@ -127,10 +209,27 @@ export default function App() {
     onPrevPage: () => activeTab && setCurrentPage((activeTab.page ?? 1) - 1),
   });
 
-  const appClass = [styles.app, focusMode ? styles.focusMode : ""]
-    .filter(Boolean).join(" ");
+  const appClass = [styles.app, focusMode ? styles.focusMode : ""].filter(Boolean).join(" ");
+  const hasPdf   = activePdf != null;
 
-  const hasPdf = activePdf != null;
+  if (sessionLoading) {
+    return (
+      <div style={{
+        height: "100vh", display: "flex", alignItems: "center",
+        justifyContent: "center", background: "#0d1117",
+        flexDirection: "column", gap: "16px",
+      }}>
+        <div style={{
+          width: "36px", height: "36px",
+          border: "3px solid #30363d", borderTopColor: "#4fc3f7",
+          borderRadius: "50%", animation: "spin 0.8s linear infinite",
+        }} />
+        <p style={{ fontSize: "13px", color: "#8b949e", fontFamily: "sans-serif" }}>
+          Restoring your session…
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className={appClass}>
@@ -140,45 +239,35 @@ export default function App() {
         settingsOpen={settingsOpen}
         onFileLoaded={loadPdf}
       />
-
-      {/* Tab bar — shown when at least one PDF is open */}
       <TabBar onFileLoaded={loadPdf} />
-
       <Toolbar onFileLoaded={loadPdf} />
-      <SearchBar />
-
+      <SearchBar pdf={activePdf} />
       <div className={styles.body}>
         {hasPdf && sidebarOpen && !focusMode && (
           <Sidebar pdf={activePdf} outline={activeOutline} />
         )}
-
         <div className={styles.main}>
           {loading && (
-            <div className={styles.loadingOverlay} role="status" aria-live="polite">
-              <div className={styles.spinner} aria-hidden="true" />
+            <div className={styles.loadingOverlay} role="status">
+              <div className={styles.spinner} />
               <p>Opening document…</p>
             </div>
           )}
-
           {loadError && (
             <div className={styles.errorBox} role="alert">
               <p>⚠ {loadError}</p>
               <button onClick={() => setLoadError(null)}>Dismiss</button>
             </div>
           )}
-
           {!hasPdf && !loading && !loadError && (
             <WelcomeScreen onFileLoaded={loadPdf} />
           )}
-
           {hasPdf && <Viewer pdf={activePdf} />}
         </div>
-
         {settingsOpen && !focusMode && (
           <SettingsPanel onClose={() => setSettingsOpen(false)} />
         )}
       </div>
-
       <StatusBar />
     </div>
   );

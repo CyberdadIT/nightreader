@@ -1,12 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=JetBrains+Mono:wght@400;500&family=Sora:wght@300;400;500;600&display=swap');
 
-/* ─── Design tokens ─────────────────────────────────────────────────────── */
 :root {
   --font-serif: 'Crimson Pro', Georgia, serif;
   --font-sans:  'Sora', system-ui, sans-serif;
   --font-mono:  'JetBrains Mono', 'Fira Code', monospace;
-
-  /* Night palette (default) */
   --bg:          #0d1117;
   --surface:     #161b22;
   --panel:       #21262d;
@@ -19,35 +16,16 @@
   --accent3:     #a5d6a7;
   --warn:        #ffb74d;
   --danger:      #f47067;
-
-  /* Page mode colours */
-  --page-dark:   #1a1f2a;
-  --page-light:  #f5f0e8;
-  --page-sepia:  #f0e6c8;
-  --page-amoled: #000000;
-  --page-green:  #0a1a0a;
-
-  --text-dark:   #e6edf3;
-  --text-light:  #1a1a2e;
-  --text-sepia:  #3d2b1a;
-  --text-amoled: #d0d0d0;
-  --text-green:  #90ee90;
-
-  /* Highlight colours */
   --hl-yellow: rgba(255, 214, 0, 0.35);
   --hl-blue:   rgba(79, 195, 247, 0.3);
   --hl-pink:   rgba(244, 143, 177, 0.3);
   --hl-green:  rgba(165, 214, 167, 0.3);
-
   --radius:    8px;
   --radius-lg: 14px;
-
-  /* Safe area insets (iOS notch / Android nav bar) */
   --safe-top:    env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* ─── Reset ─────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body, #root {
@@ -57,65 +35,73 @@ html, body, #root {
   color: var(--text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
 }
 
-button {
-  font-family: var(--font-sans);
-  cursor: pointer;
-}
+button { font-family: var(--font-sans); cursor: pointer; }
+input, select, textarea { font-family: var(--font-sans); }
 
-input, select, textarea {
-  font-family: var(--font-sans);
-}
-
-/* ─── Scrollbars ─────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
 
-/* ─── Selection ──────────────────────────────────────────────────────────── */
-::selection { background: rgba(79, 195, 247, 0.25); }
+::selection { background: rgba(79, 195, 247, 0.35); }
 
-/* ─── Utility classes ────────────────────────────────────────────────────── */
 .sr-only {
-  position: absolute;
-  width: 1px; height: 1px;
-  padding: 0; margin: -1px;
-  overflow: hidden;
-  clip: rect(0,0,0,0);
-  white-space: nowrap;
-  border: 0;
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); white-space: nowrap; border: 0;
 }
 
-/* ─── Annotations ────────────────────────────────────────────────────────── */
+/* ─── PDF.js text layer ───────────────────────────────────────────────────
+   The .textLayer class is what PDF.js v4 uses internally.
+   Key rules:
+   - overflow: visible (not hidden — clips selection)
+   - user-select: text (allows mouse selection)
+   - pointer-events: none on overlay ABOVE it so clicks pass through
+   - color: transparent on spans so they don't show as ghost text
+   - ::selection keeps highlight visible
+*/
+.textLayer {
+  position: absolute !important;
+  inset: 0 !important;
+  overflow: visible !important;
+  opacity: 1 !important;
+  line-height: 1 !important;
+  text-size-adjust: none !important;
+  -webkit-text-size-adjust: none !important;
+  forced-color-adjust: none !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  cursor: text !important;
+  z-index: 2 !important;
+}
+
+.textLayer span,
+.textLayer br {
+  color: transparent !important;
+  position: absolute !important;
+  white-space: pre !important;
+  cursor: text !important;
+  transform-origin: 0% 0% !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  pointer-events: auto !important;
+}
+
+.textLayer span::selection,
+.textLayer ::selection {
+  background-color: rgba(79, 195, 247, 0.4) !important;
+  color: transparent !important;
+}
+
+/* ─── Annotation styles ───────────────────────────────────────────────── */
 .hl-yellow  { background: var(--hl-yellow); border-radius: 2px; padding: 0 2px; }
 .hl-blue    { background: var(--hl-blue);   border-radius: 2px; padding: 0 2px; }
 .hl-pink    { background: var(--hl-pink);   border-radius: 2px; padding: 0 2px; }
 .hl-green   { background: var(--hl-green);  border-radius: 2px; padding: 0 2px; }
-.underline  { text-decoration: underline; text-decoration-color: var(--accent2); text-decoration-thickness: 2px; }
+.underline  { text-decoration: underline; text-decoration-color: var(--accent2); }
 .strike     { text-decoration: line-through; text-decoration-color: var(--danger); }
 
-/* ─── PDF.js text layer global fix ──────────────────────────────────────── */
-/* These spans are injected by PDF.js and MUST be transparent.              */
-/* Without this, they appear as ghost/watermark text over the canvas.       */
-[aria-label*="Page"][aria-label*="text"] span,
-[aria-label*="Page"][aria-label*="text"] br {
-  color: transparent !important;
-  position: absolute;
-  white-space: pre;
-  cursor: text;
-  transform-origin: 0% 0%;
-}
-
-[aria-label*="Page"][aria-label*="text"] ::selection {
-  background: rgba(79, 195, 247, 0.4) !important;
-  color: transparent !important;
-}
-
-/* PDF.js text layer class (used by newer pdfjs versions) */
-.textLayer span,
-.textLayer br {
-  color: transparent !important;
-}
+/* ─── Spinner ─────────────────────────────────────────────────────────── */
+@keyframes spin { to { transform: rotate(360deg); } }

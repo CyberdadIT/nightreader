@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useStore } from "../store/useStore.js";
 import styles from "./Sidebar.module.css";
-import * as pdfjsLib from "pdfjs-dist";
 
 const TABS = ["Pages", "Contents", "Bookmarks"];
 
 export default function Sidebar({ pdf, outline }) {
-  const [tab, setTab]                   = useState(0);
-  const [resolvedOutline, setResolved]  = useState([]);
-  const [thumbnails, setThumbnails]     = useState({});
-  const thumbCanvasRef                  = useRef({});
+  const [tab, setTab]                  = useState(0);
+  const [resolvedOutline, setResolved] = useState([]);
+  const [thumbnails, setThumbnails]    = useState({});
+  const pdfIdRef                       = useRef(null); // track which PDF thumbnails belong to
 
   const activeTab      = useStore((s) => s.getActiveTab());
+  const activeTabId    = useStore((s) => s.activeTabId);
   const currentPage    = activeTab?.page ?? 1;
   const totalPages     = activeTab?.totalPages ?? 0;
   const bookmarks      = useStore((s) => s.bookmarks);
@@ -21,9 +21,22 @@ export default function Sidebar({ pdf, outline }) {
 
   const fileBookmarks = bookmarks.filter((b) => b.filePath === filePath);
 
-  // ── Resolve TOC destinations to page numbers ──────────────────────────
+  // ── Clear thumbnails and outline when tab/PDF changes ─────────────────
+  useEffect(() => {
+    // Use the pdf object reference itself as the key
+    const pdfKey = pdf ? (pdf._pdfInfo?.fingerprints?.[0] ?? activeTabId) : null;
+    if (pdfKey !== pdfIdRef.current) {
+      pdfIdRef.current = pdfKey;
+      setThumbnails({});   // clear old thumbnails
+      setResolved([]);     // clear old TOC
+    }
+  }, [pdf, activeTabId]);
+
+  // ── Resolve TOC destinations ──────────────────────────────────────────
   useEffect(() => {
     if (!pdf || !outline || outline.length === 0) { setResolved([]); return; }
+    let cancelled = false;
+
     async function resolveItem(item) {
       let pageNum = null;
       try {
@@ -41,37 +54,62 @@ export default function Sidebar({ pdf, outline }) {
         : [];
       return { title: item.title, page: pageNum, items: children };
     }
-    Promise.all(outline.map(resolveItem)).then(setResolved);
+
+    Promise.all(outline.map(resolveItem)).then((resolved) => {
+      if (!cancelled) setResolved(resolved);
+    });
+
+    return () => { cancelled = true; };
   }, [pdf, outline]);
 
-  // ── Render page thumbnails ────────────────────────────────────────────
+  // ── Render page thumbnails for current PDF ────────────────────────────
   useEffect(() => {
     if (!pdf || tab !== 0) return;
     let cancelled = false;
 
     async function renderThumbs() {
-      const scale = 0.2; // small thumbnails
-      for (let i = 1; i <= Math.min(totalPages, 50); i++) {
+      const scale = 0.2;
+      const limit = Math.min(totalPages, 50);
+
+      for (let i = 1; i <= limit; i++) {
         if (cancelled) break;
-        if (thumbnails[i]) continue; // already rendered
+
+        // Skip if already rendered for this PDF
+        setThumbnails((prev) => {
+          if (prev[i]) return prev; // already done
+          return prev;
+        });
+
+        // Check outside setState if we already have it
         try {
-          const page = await pdf.getPage(i);
-          const vp   = page.getViewport({ scale });
+          const page   = await pdf.getPage(i);
+          if (cancelled) break;
+
+          const vp     = page.getViewport({ scale });
           const canvas = document.createElement("canvas");
           canvas.width  = Math.floor(vp.width);
           canvas.height = Math.floor(vp.height);
           const ctx = canvas.getContext("2d");
           await page.render({ canvasContext: ctx, viewport: vp }).promise;
+
           if (!cancelled) {
-            setThumbnails((prev) => ({ ...prev, [i]: canvas.toDataURL("image/jpeg", 0.7) }));
+            const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+            setThumbnails((prev) => {
+              // Only add if we haven't been cleared (pdf changed)
+              return { ...prev, [i]: dataUrl };
+            });
           }
         } catch {}
       }
     }
 
-    renderThumbs();
-    return () => { cancelled = true; };
-  }, [pdf, tab, totalPages]);
+    // Small delay to let the clear take effect before rendering new thumbs
+    const timer = setTimeout(renderThumbs, 50);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [pdf, tab, totalPages, activeTabId]); // activeTabId forces re-run on tab switch
 
   return (
     <aside className={styles.sidebar} aria-label="Document sidebar">
@@ -95,7 +133,7 @@ export default function Sidebar({ pdf, outline }) {
         {tab === 0 && (
           <div className={styles.thumbGrid}>
             {Array.from({ length: totalPages }, (_, i) => {
-              const n = i + 1;
+              const n     = i + 1;
               const thumb = thumbnails[n];
               return (
                 <div
@@ -115,7 +153,7 @@ export default function Sidebar({ pdf, outline }) {
                     ) : (
                       <div className={styles.thumbPlaceholder}>
                         <div className={styles.thumbLines}>
-                          {[100,70,85,100,60,80,90,65].map((w,j) => (
+                          {[100,70,85,100,60,80,90,65].map((w, j) => (
                             <div key={j} className={styles.thumbLine} style={{ width: `${w}%` }} />
                           ))}
                         </div>
