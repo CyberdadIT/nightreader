@@ -105,3 +105,53 @@ input, select, textarea { font-family: var(--font-sans); }
 
 /* ─── Spinner ─────────────────────────────────────────────────────────── */
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── PDF.js TextLayer ───────────────────────────────────────────────── */
+.textLayer {
+  position: absolute;
+  text-size-adjust: none;
+  forced-color-adjust: none;
+  transform-origin: 0 0;
+  z-index: 2;
+  overflow: visible !important;
+  /* The container itself must NOT receive pointer events.
+     Only the individual <span> elements inside it are interactive.
+     This is the key fix that stops entire-page selection. */
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Each text span IS selectable */
+.textLayer span {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Highlight colour when dragging to select */
+.textLayer span::selection {
+  background: rgba(79, 195, 247, 0.4);
+  color: transparent;
+}
+.textLayer span::-moz-selection {
+  background: rgba(79, 195, 247, 0.4);
+  color: transparent;
+}
+
+/* PDF link overlays */
+.textLayer a[data-pdf-link] {
+  pointer-events: auto;
+  cursor: pointer;
+  color: transparent;
+  text-decoration: none;
+}
+.textLayer a[data-pdf-link]:hover {
+  background: rgba(79, 195, 247, 0.15);
+  border-radius: 2px;
+}

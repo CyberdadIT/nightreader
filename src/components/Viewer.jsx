@@ -3,16 +3,16 @@ import PdfPage from "./PdfPage.jsx";
 import { useStore } from "../store/useStore.js";
 
 export default function Viewer({ pdf }) {
-  const containerRef = useRef(null);
-  const activeTab    = useStore((s) => s.getActiveTab());
-  const currentPage  = activeTab?.page ?? 1;
-  const totalPages   = activeTab?.totalPages ?? 0;
-  const scrollMode   = useStore((s) => s.scrollMode);
-  const zoom         = useStore((s) => s.zoom);
-  const brightness   = useStore((s) => s.brightness);
-  const focusMode    = useStore((s) => s.focusMode);
-  const readingMode  = useStore((s) => s.readingMode);
-  const annotMode    = useStore((s) => s.annotMode);
+  const containerRef   = useRef(null);
+  const activeTab      = useStore((s) => s.getActiveTab());
+  const currentPage    = activeTab?.page ?? 1;
+  const totalPages     = activeTab?.totalPages ?? 0;
+  const scrollMode     = useStore((s) => s.scrollMode);
+  const zoom           = useStore((s) => s.zoom);
+  const brightness     = useStore((s) => s.brightness);
+  const focusMode      = useStore((s) => s.focusMode);
+  const readingMode    = useStore((s) => s.readingMode);
+  const annotMode      = useStore((s) => s.annotMode);
   const setCurrentPage = useStore((s) => s.setCurrentPage);
   const addAnnotation  = useStore((s) => s.addAnnotation);
   const filePath       = activeTab?.path ?? null;
@@ -21,29 +21,28 @@ export default function Viewer({ pdf }) {
   const [scrollKey, setScrollKey] = useState(0);
   const [copied,    setCopied]    = useState(false);
 
+  // Track mouse-down position to detect intentional drag vs click
+  const dragStartRef = useRef(null);
+
   const scale = 1.8 * zoom;
 
   const bgColors = {
     dark: "#0d1117", light: "#e8e4dc",
     sepia: "#e8dfc4", amoled: "#000000", green: "#050f05",
   };
-
   const hlColors = {
-    yellow: "rgba(255,214,0,0.5)", blue:  "rgba(79,195,247,0.5)",
-    pink:   "rgba(244,143,177,0.5)", green: "rgba(165,214,167,0.5)",
+    yellow: "rgba(255,214,0,0.5)", blue: "rgba(79,195,247,0.5)",
+    pink: "rgba(244,143,177,0.5)", green: "rgba(165,214,167,0.5)",
   };
 
-  // Force re-render pages on scroll mode toggle
   useEffect(() => { setScrollKey((k) => k + 1); }, [scrollMode]);
 
-  // Scroll to page in continuous mode
   useEffect(() => {
     if (!scrollMode || !containerRef.current) return;
     const el = containerRef.current.querySelector(`[data-page="${currentPage}"]`);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [currentPage, scrollMode, scrollKey]);
 
-  // Track visible page while scrolling
   const onScroll = useCallback(() => {
     if (!scrollMode || !containerRef.current) return;
     const container    = containerRef.current;
@@ -57,52 +56,122 @@ export default function Viewer({ pdf }) {
     if (bestPage !== currentPage) setCurrentPage(bestPage);
   }, [scrollMode, currentPage, setCurrentPage]);
 
-  // ── Text selection popup — listen at document level ───────────────────
+  // ── Link click handler ────────────────────────────────────────────────
   useEffect(() => {
-    function handleMouseUp(e) {
-      // Don't trigger if click is inside the popup itself
-      if (e.target.closest("[data-popup-bar]")) return;
-
-      setTimeout(() => {
-        const sel = window.getSelection();
-        if (!sel || sel.isCollapsed || sel.toString().trim().length < 1) {
-          return; // don't close existing popup on empty click
-        }
-
-        const text = sel.toString().trim();
-        const range = sel.getRangeAt(0);
-
-        // Find page number from the text layer element
-        const node    = range.commonAncestorContainer;
-        const pageEl  = (node.nodeType === 1 ? node : node.parentElement)
-                        ?.closest("[data-page]");
-        const pageNum = pageEl ? Number(pageEl.dataset.page) : currentPage;
-
-        const rect = range.getBoundingClientRect();
-        if (rect.width === 0 && rect.height === 0) return;
-
-        setPopup({
-          x:       rect.left + rect.width / 2,
-          y:       rect.top,
-          text,
-          pageNum,
-        });
-        setCopied(false);
-      }, 20);
+    function handleLinkClick(e) {
+      const link = e.target.closest("a[href]");
+      if (!link) return;
+      const href = link.getAttribute("href");
+      if (!href) return;
+      if (href.startsWith("http") || href.startsWith("mailto:")) {
+        e.preventDefault();
+        e.stopPropagation();
+        window.open(href, "_blank", "noopener,noreferrer");
+      }
     }
+    document.addEventListener("click", handleLinkClick, true);
+    return () => document.removeEventListener("click", handleLinkClick, true);
+  }, []);
 
+  // ── Smart text selection ──────────────────────────────────────────────
+  // Problem: PDF.js spans are absolutely positioned with CSS transforms.
+  // The browser's drag-select treats the entire textLayer div as one block
+  // and selects everything from start to end, ignoring the visual lines.
+  //
+  // Solution: on mouseup, we look at ONLY the spans whose bounding boxes
+  // overlap with the user's drag rectangle. We then read text only from
+  // those spans. This gives a selection that matches what you can see.
+  useEffect(() => {
     function handleMouseDown(e) {
-      // Close popup when clicking outside it
       if (e.target.closest("[data-popup-bar]")) return;
+      dragStartRef.current = { x: e.clientX, y: e.clientY };
       setPopup(null);
       setCopied(false);
     }
 
-    document.addEventListener("mouseup",   handleMouseUp);
+    function handleMouseUp(e) {
+      if (e.target.closest("[data-popup-bar]")) return;
+      const start = dragStartRef.current;
+      if (!start) return;
+
+      const end = { x: e.clientX, y: e.clientY };
+      const dx = Math.abs(end.x - start.x);
+      const dy = Math.abs(end.y - start.y);
+
+      // Ignore clicks (no meaningful drag)
+      if (dx < 4 && dy < 4) return;
+
+      // Build a selection rectangle from drag start to end
+      const selRect = {
+        left:   Math.min(start.x, end.x),
+        right:  Math.max(start.x, end.x),
+        top:    Math.min(start.y, end.y),
+        bottom: Math.max(start.y, end.y),
+      };
+
+      // Find the page the drag happened on
+      const pageEl = e.target.closest("[data-page]") ||
+        document.elementFromPoint(
+          (start.x + end.x) / 2,
+          (start.y + end.y) / 2
+        )?.closest("[data-page]");
+      const pageNum = pageEl ? Number(pageEl.dataset.page) : currentPage;
+
+      // Collect all text spans on that page
+      const textLayer = pageEl?.querySelector(".textLayer");
+      if (!textLayer) return;
+
+      const spans = Array.from(textLayer.querySelectorAll("span"));
+
+      // Keep only spans whose bounding rect overlaps the drag selection rect
+      // Add a small vertical tolerance (4px) to catch spans on the same line
+      const TOLERANCE = 4;
+      const hitSpans = spans.filter((span) => {
+        const r = span.getBoundingClientRect();
+        return (
+          r.right  >= selRect.left   - TOLERANCE &&
+          r.left   <= selRect.right  + TOLERANCE &&
+          r.bottom >= selRect.top    - TOLERANCE &&
+          r.top    <= selRect.bottom + TOLERANCE &&
+          r.width  > 0 && r.height > 0
+        );
+      });
+
+      if (hitSpans.length === 0) return;
+
+      // Sort spans by their visual position (top first, then left)
+      hitSpans.sort((a, b) => {
+        const ra = a.getBoundingClientRect();
+        const rb = b.getBoundingClientRect();
+        if (Math.abs(ra.top - rb.top) > 4) return ra.top - rb.top;
+        return ra.left - rb.left;
+      });
+
+      // Join their text, collapsing extra whitespace
+      const text = hitSpans
+        .map((s) => s.textContent)
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      if (!text) return;
+
+      // Show popup centered above the drag selection
+      const midX = (selRect.left + selRect.right)  / 2;
+      const topY =  selRect.top;
+
+      setPopup({ x: midX, y: topY, text, pageNum });
+      setCopied(false);
+
+      // Also clear the browser's built-in selection (which grabbed too much)
+      window.getSelection()?.removeAllRanges();
+    }
+
     document.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("mouseup",   handleMouseUp);
     return () => {
-      document.removeEventListener("mouseup",   handleMouseUp);
       document.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("mouseup",   handleMouseUp);
     };
   }, [currentPage]);
 
@@ -113,11 +182,9 @@ export default function Viewer({ pdf }) {
     } catch {
       const ta = document.createElement("textarea");
       ta.value = popup.text;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
+      ta.style.cssText = "position:fixed;opacity:0;top:0;left:0;";
       document.body.appendChild(ta);
-      ta.focus();
-      ta.select();
+      ta.focus(); ta.select();
       document.execCommand("copy");
       document.body.removeChild(ta);
     }
@@ -135,8 +202,10 @@ export default function Viewer({ pdf }) {
   if (!pdf) return null;
 
   const darknessAlpha = ((100 - brightness) / 100) * 0.85;
-  const popupX = popup ? Math.max(160, Math.min(popup.x, window.innerWidth - 160)) : 0;
-  const popupY = popup ? Math.max(10, popup.y - 50) : 0;
+  const popupX = popup
+    ? Math.max(160, Math.min(popup.x, window.innerWidth - 160))
+    : 0;
+  const popupY = popup ? Math.max(10, popup.y - 52) : 0;
 
   return (
     <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", position: "relative" }}>
@@ -149,7 +218,6 @@ export default function Viewer({ pdf }) {
         transition: "background 0.3s ease",
       }} aria-hidden="true" />
 
-      {/* Annotate mode banner */}
       {annotMode && (
         <div style={{
           position: "absolute", top: "8px", left: "50%",
@@ -161,49 +229,35 @@ export default function Viewer({ pdf }) {
           zIndex: 60, pointerEvents: "none",
           fontFamily: "sans-serif", whiteSpace: "nowrap",
         }}>
-          ✏ Select text to copy, highlight or annotate
+          ✏ Drag over text to copy, highlight or annotate
         </div>
       )}
 
-      {/* Selection toolbar popup */}
+      {/* Selection popup */}
       {popup && (
         <div
           data-popup-bar="true"
           style={{
-            position:  "fixed",
-            left:      `${popupX}px`,
-            top:       `${popupY}px`,
+            position: "fixed",
+            left: `${popupX}px`, top: `${popupY}px`,
             transform: "translateX(-50%)",
-            background: "#1c2128",
-            border:     "1px solid #30363d",
-            borderRadius: "8px",
-            padding: "5px 8px",
-            display: "flex",
-            alignItems: "center",
-            gap: "5px",
-            zIndex: 400,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+            background: "#1c2128", border: "1px solid #30363d",
+            borderRadius: "8px", padding: "5px 8px",
+            display: "flex", alignItems: "center", gap: "5px",
+            zIndex: 400, boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
             userSelect: "none",
           }}
         >
-          {/* Copy button */}
           <button
             onMouseDown={(e) => e.preventDefault()}
             onClick={handleCopy}
             style={{
               background:   copied ? "rgba(165,214,167,0.25)" : "rgba(255,255,255,0.08)",
               border:       "1px solid rgba(255,255,255,0.15)",
-              borderRadius: "6px",
-              color:        copied ? "#a5d6a7" : "#e6edf3",
-              fontSize:     "12px",
-              fontWeight:   600,
-              cursor:       "pointer",
-              padding:      "4px 14px",
-              fontFamily:   "sans-serif",
-              transition:   "all 0.15s",
-              whiteSpace:   "nowrap",
-              minWidth:     "80px",
-              textAlign:    "center",
+              borderRadius: "6px", color: copied ? "#a5d6a7" : "#e6edf3",
+              fontSize: "12px", fontWeight: 600, cursor: "pointer",
+              padding: "4px 14px", fontFamily: "sans-serif",
+              whiteSpace: "nowrap", minWidth: "80px", textAlign: "center",
             }}
           >
             {copied ? "✓ Copied!" : "⎘ Copy"}
@@ -211,21 +265,15 @@ export default function Viewer({ pdf }) {
 
           <div style={{ width: "1px", height: "20px", background: "#30363d", flexShrink: 0 }} />
 
-          {/* Highlight colours */}
           {["yellow","blue","pink","green"].map((c) => (
-            <button
-              key={c}
+            <button key={c}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => applyAnnotation(`hl-${c}`)}
               title={`Highlight ${c}`}
               style={{
-                width: "22px", height: "22px",
-                borderRadius: "50%",
-                background: hlColors[c],
-                border: "1px solid rgba(255,255,255,0.3)",
-                cursor: "pointer",
-                flexShrink: 0,
-                transition: "transform 0.1s",
+                width: "22px", height: "22px", borderRadius: "50%",
+                background: hlColors[c], border: "1px solid rgba(255,255,255,0.3)",
+                cursor: "pointer", flexShrink: 0, transition: "transform 0.1s",
               }}
               onMouseEnter={(e) => e.currentTarget.style.transform = "scale(1.25)"}
               onMouseLeave={(e) => e.currentTarget.style.transform = "scale(1)"}
@@ -234,53 +282,23 @@ export default function Viewer({ pdf }) {
 
           <div style={{ width: "1px", height: "20px", background: "#30363d", flexShrink: 0 }} />
 
-          {/* Underline */}
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => applyAnnotation("underline")}
-            title="Underline"
-            style={{
-              background: "transparent", border: "none",
-              color: "#f48fb1", fontSize: "13px",
-              cursor: "pointer", padding: "2px 6px",
-              fontFamily: "sans-serif",
-              textDecoration: "underline",
-              textDecorationColor: "#f48fb1",
-            }}
-          >U</button>
-
-          {/* Strikethrough */}
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => applyAnnotation("strikethrough")}
-            title="Strikethrough"
-            style={{
-              background: "transparent", border: "none",
-              color: "#ef9a9a", fontSize: "13px",
-              cursor: "pointer", padding: "2px 6px",
-              fontFamily: "sans-serif",
-              textDecoration: "line-through",
-            }}
-          >S</button>
+          <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyAnnotation("underline")}
+            style={{ background: "transparent", border: "none", color: "#f48fb1", fontSize: "14px", cursor: "pointer", padding: "2px 6px", fontFamily: "sans-serif", textDecoration: "underline", textDecorationColor: "#f48fb1" }}>U</button>
+          <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyAnnotation("strikethrough")}
+            style={{ background: "transparent", border: "none", color: "#ef9a9a", fontSize: "14px", cursor: "pointer", padding: "2px 6px", fontFamily: "sans-serif", textDecoration: "line-through" }}>S</button>
 
           <div style={{ width: "1px", height: "20px", background: "#30363d", flexShrink: 0 }} />
 
-          {/* Close */}
-          <button
-            onMouseDown={(e) => e.preventDefault()}
+          <button onMouseDown={(e) => e.preventDefault()}
             onClick={() => { setPopup(null); window.getSelection()?.removeAllRanges(); }}
-            style={{
-              background: "transparent", border: "none",
-              color: "#8b949e", fontSize: "16px",
-              cursor: "pointer", padding: "0 4px", lineHeight: 1,
-            }}
-          >×</button>
+            style={{ background: "transparent", border: "none", color: "#8b949e", fontSize: "18px", cursor: "pointer", padding: "0 4px", lineHeight: 1 }}>×</button>
         </div>
       )}
 
-      {/* Page area */}
+      {/* Scrollable page area */}
       <div
         ref={containerRef}
+        data-viewer-scroll="true"
         onScroll={onScroll}
         style={{
           flex: 1, overflowY: "auto", overflowX: "auto",
@@ -289,8 +307,10 @@ export default function Viewer({ pdf }) {
           gap: "16px",
           background: bgColors[readingMode] || bgColors.dark,
           transition: "background 0.25s ease, padding 0.25s ease",
-          cursor: "text",
+          cursor: "crosshair",
+          outline: "none",
         }}
+        tabIndex={-1}
       >
         {scrollMode
           ? Array.from({ length: totalPages }, (_, i) => (
