@@ -17,6 +17,7 @@ export default function PdfPage({ pdf, pageNumber, scale = 1.5 }) {
   useEffect(() => {
     if (!pdf || !canvasRef.current) return;
     let cancelled = false;
+    let visibilityObserver = null;
 
     async function renderPage() {
       try {
@@ -121,9 +122,29 @@ export default function PdfPage({ pdf, pageNumber, scale = 1.5 }) {
       }
     }
 
-    renderPage();
+    // Defer rendering until the page is near the viewport.
+    // This prevents scroll mode from allocating canvas RAM for every page
+    // at once, which causes an Out of Memory crash in WebView2 on large PDFs.
+    const pageEl = canvasRef.current?.parentElement;
+    if (pageEl && typeof IntersectionObserver !== "undefined") {
+      visibilityObserver = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            visibilityObserver?.disconnect();
+            visibilityObserver = null;
+            if (!cancelled) renderPage();
+          }
+        },
+        { rootMargin: "400px 0px" } // prerender one viewport ahead/behind
+      );
+      visibilityObserver.observe(pageEl);
+    } else {
+      renderPage();
+    }
+
     return () => {
       cancelled = true;
+      visibilityObserver?.disconnect();
       renderTaskRef.current?.cancel();
     };
   }, [pdf, pageNumber, scale]);
