@@ -3,11 +3,15 @@ import { useStore } from "../store/useStore.js";
 import styles from "./SettingsPanel.module.css";
 
 const MODES = [
-  { id: "dark",   label: "Dark",   bg: "#1a1f2a", fg: "#e6edf3" },
-  { id: "light",  label: "Light",  bg: "#f5f0e8", fg: "#1a1a2e" },
-  { id: "sepia",  label: "Sepia",  bg: "#f0e6c8", fg: "#3d2b1a" },
-  { id: "amoled", label: "AMOLED", bg: "#000000", fg: "#d0d0d0" },
-  { id: "green",  label: "Matrix", bg: "#0a1a0a", fg: "#90ee90" },
+  { id: "dark",          label: "Dark",           bg: "#1a1f2a", fg: "#e6edf3" },
+  { id: "light",         label: "Light",          bg: "#f5f0e8", fg: "#1a1a2e" },
+  { id: "sepia",         label: "Sepia",          bg: "#f0e6c8", fg: "#3d2b1a" },
+  { id: "amoled",        label: "AMOLED",         bg: "#000000", fg: "#d0d0d0" },
+  { id: "green",         label: "Matrix",         bg: "#0a1a0a", fg: "#90ee90" },
+  { id: "night",         label: "Night",          bg: "#12151f", fg: "#8bb8e8" },
+  { id: "nightContrast", label: "Night Contrast", bg: "#000000", fg: "#ffffff" },
+  { id: "twilight",      label: "Twilight",       bg: "#1c1428", fg: "#c9a8f5" },
+  { id: "console",       label: "Console",        bg: "#0f0c00", fg: "#ffb300" },
 ];
 
 const HL_COLORS = [

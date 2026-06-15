@@ -29,8 +29,11 @@ export default function Viewer({ pdf }) {
   const scale = 1.8 * zoom;
 
   const bgColors = {
-    dark: "#0d1117", light: "#e8e4dc",
-    sepia: "#e8dfc4", amoled: "#000000", green: "#050f05",
+    dark:          "#0d1117", light:         "#e8e4dc",
+    sepia:         "#e8dfc4", amoled:        "#000000",
+    green:         "#050f05", night:         "#12151f",
+    nightContrast: "#000000", twilight:      "#1c1428",
+    console:       "#0f0c00",
   };
   const hlColors = {
     yellow: "rgba(255,214,0,0.5)", blue: "rgba(79,195,247,0.5)",

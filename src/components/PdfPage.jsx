@@ -129,14 +129,22 @@ export default function PdfPage({ pdf, pageNumber, scale = 1.5 }) {
   }, [pdf, pageNumber, scale]);
 
   const overlayColors = {
-    dark:   "rgba(10,14,20,0.55)",  light:  "rgba(0,0,0,0)",
-    sepia:  "rgba(112,66,20,0.25)", amoled: "rgba(0,0,0,0.78)",
-    green:  "rgba(0,30,0,0.65)",
+    dark:          "rgba(10,14,20,0.55)",   light:         "rgba(0,0,0,0)",
+    sepia:         "rgba(112,66,20,0.25)",  amoled:        "rgba(0,0,0,0.78)",
+    green:         "rgba(0,30,0,0.65)",     night:         "rgba(8,12,28,0.40)",
+    nightContrast: "rgba(0,0,0,0.15)",      twilight:      "rgba(80,30,120,0.22)",
+    console:       "rgba(180,100,0,0.18)",
   };
   const canvasFilters = {
-    dark:   "brightness(0.85) contrast(1.05)", light:  "none",
-    sepia:  "sepia(0.5) brightness(0.95)",     amoled: "brightness(0.35) contrast(1.2)",
-    green:  "brightness(0.6) contrast(1.1) hue-rotate(90deg)",
+    dark:          "brightness(0.85) contrast(1.05)",
+    light:         "none",
+    sepia:         "sepia(0.5) brightness(0.95)",
+    amoled:        "brightness(0.35) contrast(1.2)",
+    green:         "brightness(0.6) contrast(1.1) hue-rotate(90deg)",
+    night:         "brightness(0.80) contrast(1.0) saturate(0.9)",
+    nightContrast: "brightness(0.95) contrast(1.45)",
+    twilight:      "brightness(0.78) contrast(1.05) hue-rotate(255deg) saturate(0.75)",
+    console:       "brightness(0.70) contrast(1.2) sepia(0.7) saturate(0.4)",
   };
   const finalFilter = invertColors
     ? "invert(1) hue-rotate(180deg)"
