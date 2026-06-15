@@ -21,8 +21,10 @@ export default function Viewer({ pdf }) {
   const [scrollKey, setScrollKey] = useState(0);
   const [copied,    setCopied]    = useState(false);
 
-  // Track mouse-down position to detect intentional drag vs click
-  const dragStartRef = useRef(null);
+  // Track pointer-down position to detect intentional drag vs click
+  // Uses pointer events so mouse, touch, and Surface Pen all work.
+  const dragStartRef    = useRef(null);
+  const dragPointerRef  = useRef(null); // pointerId of the active drag
 
   const scale = 1.8 * zoom;
 
@@ -82,16 +84,29 @@ export default function Viewer({ pdf }) {
   // overlap with the user's drag rectangle. We then read text only from
   // those spans. This gives a selection that matches what you can see.
   useEffect(() => {
-    function handleMouseDown(e) {
+    function handlePointerDown(e) {
+      if (!e.isPrimary) return;
       if (e.target.closest("[data-popup-bar]")) return;
-      dragStartRef.current = { x: e.clientX, y: e.clientY };
+      dragStartRef.current   = { x: e.clientX, y: e.clientY };
+      dragPointerRef.current = e.pointerId;
       setPopup(null);
       setCopied(false);
     }
 
-    function handleMouseUp(e) {
+    // If the browser takes over the gesture (e.g. scroll), clear drag state
+    function handlePointerCancel(e) {
+      if (e.pointerId === dragPointerRef.current) {
+        dragStartRef.current   = null;
+        dragPointerRef.current = null;
+      }
+    }
+
+    function handlePointerUp(e) {
+      if (!e.isPrimary) return;
       if (e.target.closest("[data-popup-bar]")) return;
       const start = dragStartRef.current;
+      dragStartRef.current   = null;
+      dragPointerRef.current = null;
       if (!start) return;
 
       const end = { x: e.clientX, y: e.clientY };
@@ -167,11 +182,13 @@ export default function Viewer({ pdf }) {
       window.getSelection()?.removeAllRanges();
     }
 
-    document.addEventListener("mousedown", handleMouseDown);
-    document.addEventListener("mouseup",   handleMouseUp);
+    document.addEventListener("pointerdown",  handlePointerDown);
+    document.addEventListener("pointerup",    handlePointerUp);
+    document.addEventListener("pointercancel", handlePointerCancel);
     return () => {
-      document.removeEventListener("mousedown", handleMouseDown);
-      document.removeEventListener("mouseup",   handleMouseUp);
+      document.removeEventListener("pointerdown",  handlePointerDown);
+      document.removeEventListener("pointerup",    handlePointerUp);
+      document.removeEventListener("pointercancel", handlePointerCancel);
     };
   }, [currentPage]);
 
@@ -308,6 +325,7 @@ export default function Viewer({ pdf }) {
           background: bgColors[readingMode] || bgColors.dark,
           transition: "background 0.25s ease, padding 0.25s ease",
           cursor: "crosshair",
+          touchAction: "pan-y pinch-zoom",
           outline: "none",
         }}
         tabIndex={-1}

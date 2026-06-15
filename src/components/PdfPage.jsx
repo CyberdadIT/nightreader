@@ -169,6 +169,7 @@ export default function PdfPage({ pdf, pageNumber, scale = 1.5 }) {
         style={{
           position: "absolute", top: 0, left: 0,
           lineHeight: 1, zIndex: 2, overflow: "visible",
+          touchAction: "pan-y pinch-zoom",
         }}
         aria-label={`Page ${pageNumber} text`}
       />
