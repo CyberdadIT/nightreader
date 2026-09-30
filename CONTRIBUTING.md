@@ -5,7 +5,7 @@ Thank you for your interest in contributing! This guide will help you get starte
 ## Development setup
 
 ```bash
-git clone https://github.com/your-org/nightreader.git
+git clone https://github.com/CyberdadIT/nightreader.git
 cd nightreader
 npm install
 npm run dev          # browser dev server at localhost:1420
