@@ -42,3 +42,17 @@ test('scroll mode releases offscreen canvas allocations',async({page})=>{
  await page.getByRole('spinbutton',{name:'Current page'}).fill('12');await expect(page.locator('[data-page="12"]')).toBeInViewport();
  await expect.poll(()=>page.locator('[data-page="1"] canvas').evaluate(c=>c.width)).toBe(0);
 });
+test('mouse wheel turns pages at the edges and Ctrl+wheel zooms',async({page,isMobile})=>{
+ test.skip(isMobile,'Mouse wheel input is desktop only');
+ await importFile(page,'reading.pdf');await expect(page.locator('[data-text-root]')).toContainText('NightReader chapter 1');
+ const current=page.getByRole('spinbutton',{name:'Current page'}),viewer=page.locator('[data-viewer-scroll]');
+ const box=await viewer.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);
+ await viewer.evaluate(el=>{el.scrollTop=el.scrollHeight;});
+ await page.mouse.wheel(0,120);await expect(current).toHaveValue('2');
+ await expect.poll(()=>viewer.evaluate(el=>el.scrollTop)).toBeLessThan(5);
+ await page.waitForTimeout(400);await page.mouse.wheel(0,-120);await expect(current).toHaveValue('1');
+ await expect.poll(()=>viewer.evaluate(el=>el.scrollHeight-el.clientHeight-el.scrollTop)).toBeLessThan(5);
+ await page.keyboard.down('Control');await page.mouse.wheel(0,-120);await page.keyboard.up('Control');
+ await expect(page.getByLabel('Zoom level')).toHaveValue('110');
+});
+

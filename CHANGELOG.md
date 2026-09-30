@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+- Fixed mouse-wheel scrolling on desktop. In page-by-page and two-page views the wheel now scrolls through the page and turns to the next or previous page at the bottom or top edge. Pages that fit entirely on screen turn with a single notch.
+- Added Ctrl + mouse wheel (or trackpad pinch) to zoom PDFs and resize EPUB text.
+- Trackpad momentum no longer skips several pages after a page turn.
+
 ## [0.5.0] — reading and study tools
 
 - Added retained PDF/EPUB library and collections, persistent visible annotations, editable notes and note export.

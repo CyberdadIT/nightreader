@@ -1,6 +1,7 @@
 import React,{useRef,useState,useEffect,useLayoutEffect} from 'react';
 import {useStore} from '../store/useStore.js';
 import {selectionAnchor} from '../utils/annotations.js';
+import {stepZoom,wheelPageTurn,wheelPixels} from '../utils/navigation.js';
 import PdfPage from './PdfPage.jsx';
 import EpubChapter from './EpubChapter.jsx';
 import styles from './Viewer.module.css';
@@ -13,6 +14,50 @@ export default function Viewer({pdf}) {
     const el=container.current;const observer=new ResizeObserver(()=>setSize({width:el.clientWidth-32,height:el.clientHeight-32}));observer.observe(el);return()=>observer.disconnect();
   },[]);
   useEffect(()=>{setPopup(null);},[tab?.path,page,pdf]);
+  // Page-by-page view: start each new page at the top, or at the bottom when
+  // the wheel moved back from the next page, so reading flows continuously.
+  const enterEdge=useRef(null);
+  useLayoutEffect(()=>{
+    if(scroll&&pdf.kind!=='epub')return;
+    const el=container.current,edge=enterEdge.current;enterEdge.current=null;
+    if(edge!=='bottom'){el.scrollTop=0;return;}
+    const toBottom=()=>{el.scrollTop=el.scrollHeight;};
+    toBottom();const frame=requestAnimationFrame(toBottom),late=setTimeout(toBottom,120);
+    return()=>{cancelAnimationFrame(frame);clearTimeout(late);};
+  },[page,tab?.path,scroll,pdf.kind]);
+  // Mouse wheel and trackpad. Ctrl+wheel zooms (PDF) or resizes text (EPUB).
+  // Outside continuous-scroll mode, scrolling past the top or bottom edge turns the page.
+  useEffect(()=>{
+    const el=container.current,wheel={acc:0,dir:0,lockUntil:0,zoomAcc:0};
+    function onWheel(e){
+      const s=useStore.getState(),dy=wheelPixels(e,el.clientHeight);
+      if(e.ctrlKey||e.metaKey){
+        e.preventDefault();wheel.zoomAcc+=dy;
+        if(Math.abs(wheel.zoomAcc)<50)return;
+        const dir=wheel.zoomAcc<0?1:-1;wheel.zoomAcc=0;
+        if(pdf.kind==='epub')s.setFontSize(Math.max(12,Math.min(24,s.fontSize+dir)));else s.setZoom(stepZoom(s.zoom,dir));
+        return;
+      }
+      if(s.scrollMode&&pdf.kind!=='epub')return;
+      const now=Date.now();
+      // Swallow trackpad momentum straight after a page turn so it doesn't skip pages.
+      if(now<wheel.lockUntil){if(Math.sign(dy)===wheel.dir)e.preventDefault();return;}
+      const dir=wheelPageTurn({deltaX:e.deltaX,deltaY:dy,scrollTop:el.scrollTop,clientHeight:el.clientHeight,scrollHeight:el.scrollHeight});
+      if(!dir){wheel.acc=0;return;}
+      const current=s.getActiveTab();if(!current)return;
+      const step=s.spread&&pdf.kind!=='epub'?2:1,total=current.totalPages||1;
+      if(dir>0?current.page+step>total:current.page<=1){wheel.acc=0;return;}
+      e.preventDefault();
+      if(dir!==wheel.dir){wheel.acc=0;wheel.dir=dir;}
+      // One mouse-wheel notch (~100px) turns the page; a trackpad needs a deliberate push past the edge.
+      wheel.acc+=Math.abs(dy);if(wheel.acc<60)return;
+      wheel.acc=0;wheel.lockUntil=now+350;
+      enterEdge.current=dir>0?'top':'bottom';
+      s.setCurrentPage(current.page+dir*step);
+    }
+    el.addEventListener('wheel',onWheel,{passive:false});
+    return()=>el.removeEventListener('wheel',onWheel);
+  },[pdf]);
   useLayoutEffect(()=>{
     if(!scroll||pdf.kind==='epub')return;
     ignoreScrollUntil.current=Date.now()+250;

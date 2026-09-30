@@ -6,6 +6,7 @@ import {loadEpub,sanitizeChapter,resolveBookPath} from '../src/utils/epub.js';
 import {notesMarkdown,notesHtml} from '../src/utils/export.js';
 import {matchingOffsets,fitScale,findQuote} from '../src/utils/annotations.js';
 import {splitSpeech} from '../src/utils/speech.js';
+import {wheelPageTurn,stepZoom,wheelPixels} from '../src/utils/navigation.js';
 describe('Document identity and retained library',()=>{
  beforeEach(()=>useStore.setState({tabs:[],library:[],annotations:[],bookmarks:[],activeTabId:null}));
  it('different bytes get different identities; the same content can be reopened',async()=>{const a=await documentId([1,2]),b=await documentId([2,1]);expect(a).not.toBe(b);expect(await documentId([1,2])).toBe(a);});
@@ -20,4 +21,25 @@ describe('EPUB and annotation safety',()=>{
  it('exports notes without interpreting markup as scripts',()=>{const notes=[{page:2,quote:'<script>alert(1)</script>',note:'my note'}];expect(notesMarkdown('book',notes)).toContain('Page 2');expect(notesHtml('book',notes)).toContain('&lt;script&gt;');expect(notesHtml('book',notes)).not.toContain('<script>');});
  it('finds repeated matches without an empty-query loop',()=>{expect(matchingOffsets('Test test','test')).toEqual([{start:0,end:4},{start:5,end:9}]);expect(matchingOffsets('test','')).toEqual([]);expect(findQuote('same same','same',5)).toBe(5);});
  it('fits a spread and bounds long speech chunks',()=>{expect(fitScale(600,800,300,300,'page')).toBe(.375);expect(fitScale(600,800,300,300,'width')).toBe(.5);const chunks=splitSpeech('A very long sentence '.repeat(100));expect(chunks.every(c=>c.length<=220)).toBe(true);expect(chunks.join(' ')).toContain('long sentence');});
+});
+describe('Mouse wheel navigation',()=>{
+ const view={clientHeight:500,scrollHeight:1500};
+ it('scrolls within a page until the edge, then turns the page',()=>{
+  expect(wheelPageTurn({...view,deltaY:100,scrollTop:400})).toBe(0);
+  expect(wheelPageTurn({...view,deltaY:100,scrollTop:1000})).toBe(1);
+  expect(wheelPageTurn({...view,deltaY:-100,scrollTop:400})).toBe(0);
+  expect(wheelPageTurn({...view,deltaY:-100,scrollTop:0})).toBe(-1);
+ });
+ it('turns pages both ways when the whole page fits on screen',()=>{
+  const fits={clientHeight:800,scrollHeight:800,scrollTop:0};
+  expect(wheelPageTurn({...fits,deltaY:100})).toBe(1);expect(wheelPageTurn({...fits,deltaY:-100})).toBe(-1);
+ });
+ it('ignores sideways and empty wheel movement',()=>{
+  expect(wheelPageTurn({...view,deltaY:10,deltaX:80,scrollTop:1000})).toBe(0);
+  expect(wheelPageTurn({...view,deltaY:0,scrollTop:1000})).toBe(0);
+ });
+ it('steps zoom within bounds and normalises wheel units',()=>{
+  expect(stepZoom(1,1)).toBe(1.1);expect(stepZoom(1,-1)).toBe(.9);expect(stepZoom(4,1)).toBe(4);expect(stepZoom(.5,-1)).toBe(.5);expect(stepZoom(1.3,-1)).toBe(1.25);
+  expect(wheelPixels({deltaMode:0,deltaY:100},500)).toBe(100);expect(wheelPixels({deltaMode:1,deltaY:3},500)).toBe(48);expect(wheelPixels({deltaMode:2,deltaY:1},500)).toBe(500);
+ });
 });

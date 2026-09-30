@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { useStore } from "../store/useStore.js";
-
-const ZOOM_STEPS = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0];
+import { stepZoom } from "../utils/navigation.js";
 
 export function useKeyboardShortcuts({ onNextPage, onPrevPage }) {
   const toggleSearch    = useStore((s) => s.toggleSearch);
@@ -108,14 +107,12 @@ export function useKeyboardShortcuts({ onNextPage, onPrevPage }) {
 
         case "+":
         case "=": {
-          const next = ZOOM_STEPS.find((s) => s > zoom + 0.01);
-          setZoom(next ?? ZOOM_STEPS[ZOOM_STEPS.length - 1]);
+          setZoom(stepZoom(zoom, 1));
           break;
         }
 
         case "-": {
-          const prev = [...ZOOM_STEPS].reverse().find((s) => s < zoom - 0.01);
-          setZoom(prev ?? ZOOM_STEPS[0]);
+          setZoom(stepZoom(zoom, -1));
           break;
         }
 
