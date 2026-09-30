@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.0] — reading and study tools
+
+- Added retained PDF/EPUB library and collections, persistent visible annotations, editable notes and note export.
+- Added native read aloud, bundled English OCR, PDF fit/rotation/spread and EPUB reflow controls.
+- Fixed filename collisions, recent-file retention, offscreen canvas allocations and search match rendering.
+- Repaired Android/iOS project scaffolding and added Windows, Android and iOS review builds. Linux release builds deferred.
+- See docs/RELEASE-0.5.md for platform checks and limits.
+
+
 All notable changes to NightReader are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).

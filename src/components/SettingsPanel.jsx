@@ -1,4 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
+import { notesMarkdown, notesHtml } from "../utils/export.js";
+import { saveTextFile } from "../utils/platform.js";
 import { useStore } from "../store/useStore.js";
 import styles from "./SettingsPanel.module.css";
 
@@ -22,6 +24,11 @@ const HL_COLORS = [
 ];
 
 export default function SettingsPanel({ onClose }) {
+  const [exportError, setExportError] = useState("");
+  const updateNote = useStore(s => s.updateAnnotationNote);
+  const goToPage = useStore(s => s.setCurrentPage);
+  const font = useStore(s => s.font);
+  const setFont = useStore(s => s.setFont);
   const readingMode  = useStore((s) => s.readingMode);
   const fontSize     = useStore((s) => s.fontSize);
   const lineHeight   = useStore((s) => s.lineHeight);
@@ -44,6 +51,14 @@ export default function SettingsPanel({ onClose }) {
 
   const fileAnnotations = annotations.filter((a) => a.filePath === filePath);
 
+  async function exportNotes(format) {
+    try {
+      setExportError("");
+      const name = (activeTab?.name || "document").replace(/[^a-zA-Z0-9._-]/g,"_");
+      const printable = format === "html";
+      await saveTextFile(`${name}-notes.${format}`, printable ? notesHtml(activeTab?.name, fileAnnotations, activeTab?.kind) : notesMarkdown(activeTab?.name, fileAnnotations, activeTab?.kind), printable ? "text/html" : "text/markdown");
+    } catch(e) { setExportError(e.message); }
+  }
   return (
     <aside className={styles.panel} aria-label="Settings and annotations">
       <header className={styles.header}>
@@ -94,8 +109,9 @@ export default function SettingsPanel({ onClose }) {
         {/* Sliders */}
         <section className={styles.section}>
           <SliderRow label="Brightness" min={10}  max={100} value={brightness}               display={`${brightness}%`}           onChange={setBrightness} />
+          {activeTab?.kind === "epub" && <><label>Font<select aria-label="EPUB font" value={font} onChange={e => setFont(e.target.value)}><option value="serif">Serif</option><option value="sans">Sans</option><option value="mono">Monospace</option></select></label>
           <SliderRow label="Font size"  min={12}  max={24}  value={fontSize}                 display={`${fontSize}px`}            onChange={setFontSize} />
-          <SliderRow label="Line height" min={14} max={30}  value={Math.round(lineHeight*10)} display={(lineHeight).toFixed(1)}    onChange={(v) => setLineHeight(v/10)} />
+          <SliderRow label="Line height" min={14} max={30}  value={Math.round(lineHeight*10)} display={(lineHeight).toFixed(1)}    onChange={(v) => setLineHeight(v/10)} /></>}
           <SliderRow label="Margins"    min={16}  max={80}  value={margin}                   display={`${margin}px`}              onChange={setMargin} />
         </section>
 
@@ -118,6 +134,8 @@ export default function SettingsPanel({ onClose }) {
         {/* Annotations */}
         <section className={styles.annotSection}>
           <h3 className={styles.sectionTitle}>Annotations ({fileAnnotations.length})</h3>
+          <div className="exportActions"><button disabled={!fileAnnotations.length} onClick={() => exportNotes("md")}>Export Markdown</button><button disabled={!fileAnnotations.length} onClick={() => exportNotes("html")}>Export printable HTML</button></div>
+          {exportError && <p role="alert">{exportError}</p>}
           {fileAnnotations.length === 0 ? (
             <p className={styles.empty}>
               Open a PDF and select text to add highlights and annotations.
@@ -125,11 +143,12 @@ export default function SettingsPanel({ onClose }) {
           ) : (
             fileAnnotations.map((a) => (
               <div key={a.id} className={styles.annotItem}>
-                <p className={styles.annotQuote}>
+                <button className={styles.annotQuote} onClick={() => goToPage(a.page)} title="Go to passage">
                   "{a.quote.slice(0, 90)}{a.quote.length > 90 ? "…" : ""}"
-                </p>
+                </button>
+                <textarea aria-label={`Note for ${activeTab?.kind === "epub" ? "chapter" : "page"} ${a.page}`} value={a.note || ""} placeholder="Add your note…" onChange={e => updateNote(a.id, e.target.value)} rows={3}/>
                 <div className={styles.annotMeta}>
-                  <span>Page {a.page}</span>
+                  <span>{activeTab?.kind === "epub" ? "Chapter" : "Page"} {a.page}</span>
                   <button
                     className={styles.annotDelete}
                     onClick={() => removeAnnotation(a.id)}

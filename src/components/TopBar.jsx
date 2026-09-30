@@ -3,7 +3,7 @@ import { useStore } from "../store/useStore.js";
 import { openFilePicker } from "../utils/platform.js";
 import styles from "./TopBar.module.css";
 
-export default function TopBar({ onToggleSidebar, onToggleSettings, settingsOpen, onFileLoaded }) {
+export default function TopBar({ onToggleSidebar, onToggleSettings, settingsOpen, onFileLoaded, onLibrary }) {
   const activeTab       = useStore((s) => s.getActiveTab());
   const fileName        = activeTab?.name ?? null;
   const focusMode       = useStore((s) => s.focusMode);
@@ -31,10 +31,11 @@ export default function TopBar({ onToggleSidebar, onToggleSettings, settingsOpen
       </span>
       <div className={styles.divider} />
       <nav className={styles.actions}>
+        <button className={styles.btn} onClick={onLibrary}>Library</button>
         <button className={styles.btn} onClick={onToggleSidebar} title="Toggle sidebar">▤ Sidebar</button>
         <button className={`${styles.btn} ${settingsOpen ? styles.btnActive : ""}`} onClick={onToggleSettings} title="Settings">☰ Notes</button>
         <button className={styles.btn} onClick={toggleFocusMode} title="Focus mode (R)">▭ Focus</button>
-        <button className={`${styles.btn} ${styles.openBtn}`} onClick={handleOpen}>📂 Open PDF</button>
+        <button className={`${styles.btn} ${styles.openBtn}`} onClick={handleOpen}>Open document</button>
       </nav>
     </header>
   );

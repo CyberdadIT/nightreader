@@ -34,7 +34,7 @@ export default function StatusBar() {
       <span className={styles.item}>{modeLabel}</span>
       <span className={styles.sep}>|</span>
       <span className={styles.item}>
-        Page {currentPage}{totalPages > 0 ? ` of ${totalPages}` : ""}
+        {activeTab?.kind === "epub" ? "Chapter" : "Page"} {currentPage}{totalPages > 0 ? ` of ${totalPages}` : ""}
       </span>
       {tabs.length > 1 && (
         <>
@@ -47,7 +47,7 @@ export default function StatusBar() {
         <div className={styles.progressBar} style={{ width: `${pct}%` }} />
       </div>
       <div className={styles.spacer} />
-      {remaining > 0 && <span className={styles.item}>~{remaining * 3} min left</span>}
+
       {time && (
         <>
           <span className={styles.sep}>|</span>

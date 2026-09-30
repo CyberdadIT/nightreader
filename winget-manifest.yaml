@@ -4,26 +4,25 @@
 #   winget install NightReader.NightReader
 
 PackageIdentifier: NightReader.NightReader
-PackageVersion: 0.1.0
+PackageVersion: 0.5.0
 PackageLocale: en-US
 Publisher: NightReader Contributors
-PublisherUrl: https://github.com/your-org/nightreader
-PublisherSupportUrl: https://github.com/your-org/nightreader/issues
-PrivacyUrl: https://github.com/your-org/nightreader/blob/main/PRIVACY.md
+PublisherUrl: https://github.com/CyberdadIT/nightreader
+PublisherSupportUrl: https://github.com/CyberdadIT/nightreader/issues
 Author: NightReader Contributors
 PackageName: NightReader
-PackageUrl: https://github.com/your-org/nightreader
+PackageUrl: https://github.com/CyberdadIT/nightreader
 License: GPL-3.0
-LicenseUrl: https://github.com/your-org/nightreader/blob/main/LICENSE
+LicenseUrl: https://github.com/CyberdadIT/nightreader/blob/main/LICENSE
 Copyright: Copyright © 2024 NightReader Contributors
-ShortDescription: Open-source night-mode PDF reader
+ShortDescription: Open-source night-mode PDF and EPUB reader
 Description: |-
-  NightReader is a cross-platform, open-source PDF reader built for night owls.
-  Features include five reading modes (Dark, Light, Sepia, AMOLED, Matrix),
-  real PDF rendering via PDF.js, text selection, highlights in 4 colours,
-  annotations, bookmarks, table of contents, find-in-document search,
-  continuous scroll, focus mode, font switching, and persistent settings.
-  Built with Tauri for a fast, lightweight native Windows experience (~5 MB installer).
+  NightReader is a cross-platform, open-source PDF and EPUB reader built for night owls.
+  Features include five reading modes (Dark, Light, Sepia, AMOLED, Matrix), a local
+  library with collections and saved reading position, persistent highlights and notes
+  with Markdown/HTML export, read aloud using installed Windows voices, offline English
+  OCR for scanned PDFs, fit-to-width/page, rotation, two-page spread and continuous scroll.
+  Built with Tauri for a fast, lightweight native Windows experience.
 Moniker: nightreader
 Tags:
   - pdf
@@ -31,13 +30,14 @@ Tags:
   - dark-mode
   - night-reader
   - ebook
+  - epub
   - open-source
   - tauri
-ReleaseNotesUrl: https://github.com/your-org/nightreader/releases/tag/v0.1.0
+ReleaseNotesUrl: https://github.com/CyberdadIT/nightreader/releases/tag/v0.5.0
 Installers:
   - Architecture: x64
     InstallerType: msi
-    InstallerUrl: https://github.com/your-org/nightreader/releases/download/v0.1.0/NightReader_0.1.0_x64_en-US.msi
+    InstallerUrl: https://github.com/CyberdadIT/nightreader/releases/download/v0.5.0/NightReader_0.5.0_x64_en-US.msi
     InstallerSha256: REPLACE_WITH_ACTUAL_SHA256_AFTER_BUILDING
     InstallerSwitches:
       Silent: /quiet
@@ -45,7 +45,7 @@ Installers:
     UpgradeBehavior: install
   - Architecture: x64
     InstallerType: nullsoft
-    InstallerUrl: https://github.com/your-org/nightreader/releases/download/v0.1.0/NightReader_0.1.0_x64-setup.exe
+    InstallerUrl: https://github.com/CyberdadIT/nightreader/releases/download/v0.5.0/NightReader_0.5.0_x64-setup.exe
     InstallerSha256: REPLACE_WITH_ACTUAL_SHA256_AFTER_BUILDING
     InstallerSwitches:
       Silent: /S

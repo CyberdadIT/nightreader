@@ -23,7 +23,7 @@ export default function TabBar({ onFileLoaded }) {
       borderBottom: "1px solid var(--border)",
       overflowX: "auto",
       flexShrink: 0,
-      height: "36px",
+      height: "46px",
       paddingLeft: "4px",
     }}>
       {tabs.map((tab) => {
@@ -31,6 +31,10 @@ export default function TabBar({ onFileLoaded }) {
         return (
           <div
             key={tab.id}
+            role="tab"
+            aria-selected={isActive}
+            tabIndex={0}
+            onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveTab(tab.id); } }}
             onClick={() => setActiveTab(tab.id)}
             style={{
               display: "flex",
@@ -96,8 +100,8 @@ export default function TabBar({ onFileLoaded }) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                width: "16px",
-                height: "16px",
+                width: "32px",
+                height: "44px",
                 transition: "background 0.1s, color 0.1s",
               }}
               onMouseEnter={(e) => {
@@ -133,8 +137,8 @@ export default function TabBar({ onFileLoaded }) {
         }}
         onMouseEnter={(e) => e.currentTarget.style.color = "var(--accent)"}
         onMouseLeave={(e) => e.currentTarget.style.color = "var(--muted)"}
-        title="Open new PDF"
-        aria-label="Open new PDF in new tab"
+        title="Open document"
+        aria-label="Open document in new tab"
       >
         +
       </button>
