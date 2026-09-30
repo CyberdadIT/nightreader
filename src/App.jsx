@@ -1,274 +1,98 @@
-import React, { useState, useCallback, useEffect, useRef } from "react";
-import * as pdfjsLib from "pdfjs-dist";
-
-import TopBar        from "./components/TopBar.jsx";
-import TabBar        from "./components/TabBar.jsx";
-import Toolbar       from "./components/Toolbar.jsx";
-import SearchBar     from "./components/SearchBar.jsx";
-import Sidebar       from "./components/Sidebar.jsx";
-import Viewer        from "./components/Viewer.jsx";
-import SettingsPanel from "./components/SettingsPanel.jsx";
-import StatusBar     from "./components/StatusBar.jsx";
-import WelcomeScreen from "./components/WelcomeScreen.jsx";
-
-import { useStore, savePdfData, loadPdfData } from "./store/useStore.js";
-import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts.js";
-import styles from "./App.module.css";
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url
-).toString();
-
+import React, { useState, useEffect, useCallback } from 'react';
+import TopBar from './components/TopBar.jsx';
+import TabBar from './components/TabBar.jsx';
+import Toolbar from './components/Toolbar.jsx';
+import SearchBar from './components/SearchBar.jsx';
+import Sidebar from './components/Sidebar.jsx';
+import Viewer from './components/Viewer.jsx';
+import SettingsPanel from './components/SettingsPanel.jsx';
+import StatusBar from './components/StatusBar.jsx';
+import Library from './components/Library.jsx';
+import ReadingTools from './components/ReadingTools.jsx';
+import { useStore } from './store/useStore.js';
+import { documentId, savePdfData, loadPdfData, deletePdfData, deleteOcrPages } from './utils/storage.js';
+import { loadDocument } from './utils/documents.js';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
+import styles from './App.module.css';
 export default function App() {
-  const [sidebarOpen,    setSidebarOpen]    = useState(true);
-  const [settingsOpen,   setSettingsOpen]   = useState(false);
-  const [loadError,      setLoadError]      = useState(null);
-  const [loading,        setLoading]        = useState(false);
-  const [sessionLoading, setSessionLoading] = useState(true);
-
-  const pdfDocsRef     = useRef({});
-  const hasRestoredRef = useRef(false);
-
-  const tabs                 = useStore((s) => s.tabs);
-  const activeTabId          = useStore((s) => s.activeTabId);
-  const activeTab            = useStore((s) => s.getActiveTab());
-  const openTab              = useStore((s) => s.openTab);
-  const updateTab            = useStore((s) => s.updateTab);
-  const setActiveTab         = useStore((s) => s.setActiveTab);
-  const addRecentFile        = useStore((s) => s.addRecentFile);
-  const updateRecentFilePage = useStore((s) => s.updateRecentFilePage);
-  const setCurrentPage       = useStore((s) => s.setCurrentPage);
-  const focusMode            = useStore((s) => s.focusMode);
-
-  const activePdf     = activeTabId ? pdfDocsRef.current[activeTabId] : null;
-  const activeOutline = activeTab?.outline ?? [];
-
-  // ── Safe copy — prevents ArrayBuffer detachment issues ───────────────
-  function safeCopy(data) {
-    if (data instanceof Uint8Array) {
-      // Copy the underlying buffer so original stays valid
-      const copy = new Uint8Array(data.length);
-      copy.set(data);
-      return copy;
-    }
-    if (data instanceof ArrayBuffer) {
-      return new Uint8Array(data.slice(0));
-    }
-    if (data && typeof data === "object" && !ArrayBuffer.isView(data)) {
-      const vals = Object.values(data);
-      if (vals.length > 0 && typeof vals[0] === "number") {
-        return new Uint8Array(vals);
-      }
-    }
-    return null;
-  }
-
-  // ── Load PDF bytes into a tab ─────────────────────────────────────────
-  const loadPdfIntoTab = useCallback(async (tabId, rawData) => {
-    // Always work with a fresh copy to avoid detachment
-    const bytes = safeCopy(rawData);
-    if (!bytes) throw new Error("Invalid PDF data format");
-
-    const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
-    pdfDocsRef.current[tabId] = doc;
-    updateTab(tabId, { totalPages: doc.numPages });
-
-    try {
-      const ol = await doc.getOutline();
-      updateTab(tabId, { outline: ol ?? [] });
-    } catch {
-      updateTab(tabId, { outline: [] });
-    }
-
-    return doc;
-  }, [updateTab]);
-
-  // ── Open PDF (user initiated) ─────────────────────────────────────────
-  const loadPdf = useCallback(async (file) => {
-    if (!file?.data) return;
+  const [sidebarOpen,setSidebarOpen]=useState(false), [settingsOpen,setSettingsOpen]=useState(false);
+  const [libraryOpen,setLibraryOpen]=useState(false), [doc,setDoc]=useState(null);
+  const [error,setError]=useState(''), [loading,setLoading]=useState(false), [restoring,setRestoring]=useState(true);
+  const tab=useStore(s=>s.getActiveTab()), focus=useStore(s=>s.focusMode);
+  const openTab=useStore(s=>s.openTab), updateTab=useStore(s=>s.updateTab);
+  const setPage=useStore(s=>s.setCurrentPage), upsert=useStore(s=>s.upsertDocument);
+  useEffect(()=>{
+    let cancelled=false;
+    (async()=>{
+      try {
+        const state=useStore.getState();
+        const old=[...state.tabs,...state.recentFiles].filter(f=>!state.library.some(d=>d.id===f.path));
+        for(const file of new Map(old.map(f=>[f.path,f])).values()) {
+          const bytes=await loadPdfData(file.path);
+          if(!bytes) {upsert({id:file.path,name:file.name,kind:file.kind||'pdf',needsFile:true,lastPage:file.page||file.lastPage||1});continue;}
+          const id=await documentId(bytes); await savePdfData(id,bytes);
+          useStore.getState().migrateDocument(file.path,id,file.name,file.kind||'pdf');
+          useStore.getState().updateDocument(id,{lastPage:file.page||file.lastPage||1});
+        }
+      }catch(e){if(!cancelled)setError(`Could not restore the library: ${e.message}`);}
+      finally{if(!cancelled)setRestoring(false);}
+    })();
+    return()=>{cancelled=true;};
+  },[upsert]);
+  useEffect(()=>{
+    if(restoring)return;
+    let cancelled=false, opened=null; setDoc(null);setError('');
+    if(!tab){setLoading(false);return;}
     setLoading(true);
-    setLoadError(null);
+    (async()=>{
+      try {
+        const bytes=await loadPdfData(tab.path);
+        if(!bytes)throw new Error('This document is no longer cached. Import the original file again.');
+        opened=await loadDocument(bytes,tab.kind||'pdf',tab.path);
+        if(cancelled){opened.destroy();return;}
+        setDoc(opened);
+        const outline=opened.kind==='epub'?opened.outline:await opened.getOutline().catch(()=>[]);
+        if(cancelled)return;
+        updateTab(tab.id,{totalPages:opened.numPages,outline:outline||[],page:Math.min(Math.max(1,tab.page||1),opened.numPages)});
+      }catch(e){if(!cancelled)setError(e.message||'Could not open document.');}
+      finally{if(!cancelled)setLoading(false);}
+    })();
+    return()=>{cancelled=true;opened?.destroy();};
+  },[tab?.id,tab?.path,tab?.kind,restoring,updateTab]);
+  const importFile=useCallback(async file=>{
+    if(!file?.data)return;
     try {
-      // Switch to existing tab if already open
-      const existing = useStore.getState().tabs.find((t) => t.path === file.path);
-      if (existing && pdfDocsRef.current[existing.id]) {
-        setActiveTab(existing.id);
-        setLoading(false);
-        return;
-      }
-
-      // Make a copy BEFORE anything else touches the ArrayBuffer
-      const dataCopy = safeCopy(file.data);
-      if (!dataCopy) throw new Error("Could not read PDF data");
-
-      const id = openTab(file);
-
-      // Load into PDF.js using a fresh copy
-      await loadPdfIntoTab(id, safeCopy(dataCopy));
-
-      // Save a separate copy to IndexedDB for session restore
-      await savePdfData(file.path, safeCopy(dataCopy));
-
-      addRecentFile({
-        path:     file.path,
-        name:     file.name,
-        date:     new Date().toLocaleDateString(),
-        lastPage: 1,
-      });
-    } catch (err) {
-      setLoadError(err.message ?? "Could not open this PDF.");
-    } finally {
-      setLoading(false);
-    }
-  }, [openTab, loadPdfIntoTab, addRecentFile, setActiveTab]);
-
-  // ── Session restore on startup ────────────────────────────────────────
-  useEffect(() => {
-    if (hasRestoredRef.current) return;
-    hasRestoredRef.current = true;
-
-    async function restoreSession() {
-      const savedTabs = useStore.getState().tabs;
-      if (savedTabs.length === 0) { setSessionLoading(false); return; }
-
-      let anyRestored = false;
-
-      for (const tab of savedTabs) {
-        try {
-          const stored = await loadPdfData(tab.path);
-          if (!stored) continue;
-
-          // Make a fresh copy from storage
-          const bytes = safeCopy(stored);
-          if (!bytes) continue;
-
-          // Validate it's actually a PDF (%PDF header)
-          if (bytes[0] !== 0x25 || bytes[1] !== 0x50) continue;
-
-          // Load using yet another copy so storage data stays intact
-          await loadPdfIntoTab(tab.id, safeCopy(bytes));
-          anyRestored = true;
-        } catch (err) {
-          console.warn(`Could not restore "${tab.name}":`, err);
-        }
-      }
-
-      // Clean up tabs that couldn't be restored
-      const currentTabs = useStore.getState().tabs;
-      for (const tab of currentTabs) {
-        if (!pdfDocsRef.current[tab.id]) {
-          useStore.getState().closeTab(tab.id);
-        }
-      }
-
-      setSessionLoading(false);
-    }
-
-    restoreSession();
-  }, [loadPdfIntoTab]);
-
-  // ── Save reading position ─────────────────────────────────────────────
-  useEffect(() => {
-    if (!activeTab) return;
-    updateRecentFilePage(activeTab.path, activeTab.page);
-  }, [activeTab?.page, activeTab?.path]);
-
-  // ── Clean up closed docs ──────────────────────────────────────────────
-  useEffect(() => {
-    const activeIds = new Set(tabs.map((t) => t.id));
-    Object.keys(pdfDocsRef.current).forEach((id) => {
-      if (!activeIds.has(id)) {
-        pdfDocsRef.current[id]?.destroy?.();
-        delete pdfDocsRef.current[id];
-      }
-    });
-  }, [tabs]);
-
-  // ── Drag and drop ─────────────────────────────────────────────────────
-  useEffect(() => {
-    async function onDrop(e) {
-      e.preventDefault();
-      for (const file of Array.from(e.dataTransfer?.files ?? [])) {
-        const data = await file.arrayBuffer();
-        await loadPdf({ path: file.name, name: file.name, data });
-      }
-    }
-    function onDragOver(e) { e.preventDefault(); }
-    window.addEventListener("drop", onDrop);
-    window.addEventListener("dragover", onDragOver);
-    return () => {
-      window.removeEventListener("drop", onDrop);
-      window.removeEventListener("dragover", onDragOver);
-    };
-  }, [loadPdf]);
-
-  // ── Keyboard shortcuts ────────────────────────────────────────────────
-  useKeyboardShortcuts({
-    onNextPage: () => activeTab && setCurrentPage((activeTab.page ?? 1) + 1),
-    onPrevPage: () => activeTab && setCurrentPage((activeTab.page ?? 1) - 1),
-  });
-
-  const appClass = [styles.app, focusMode ? styles.focusMode : ""].filter(Boolean).join(" ");
-  const hasPdf   = activePdf != null;
-
-  if (sessionLoading) {
-    return (
-      <div style={{
-        height: "100vh", display: "flex", alignItems: "center",
-        justifyContent: "center", background: "#0d1117",
-        flexDirection: "column", gap: "16px",
-      }}>
-        <div style={{
-          width: "36px", height: "36px",
-          border: "3px solid #30363d", borderTopColor: "#4fc3f7",
-          borderRadius: "50%", animation: "spin 0.8s linear infinite",
-        }} />
-        <p style={{ fontSize: "13px", color: "#8b949e", fontFamily: "sans-serif" }}>
-          Restoring your session…
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className={appClass}>
-      <TopBar
-        onToggleSidebar={() => setSidebarOpen((o) => !o)}
-        onToggleSettings={() => setSettingsOpen((o) => !o)}
-        settingsOpen={settingsOpen}
-        onFileLoaded={loadPdf}
-      />
-      <TabBar onFileLoaded={loadPdf} />
-      <Toolbar onFileLoaded={loadPdf} />
-      <SearchBar pdf={activePdf} />
-      <div className={styles.body}>
-        {hasPdf && sidebarOpen && !focusMode && (
-          <Sidebar pdf={activePdf} outline={activeOutline} />
-        )}
-        <div className={styles.main}>
-          {loading && (
-            <div className={styles.loadingOverlay} role="status">
-              <div className={styles.spinner} />
-              <p>Opening document…</p>
-            </div>
-          )}
-          {loadError && (
-            <div className={styles.errorBox} role="alert">
-              <p>⚠ {loadError}</p>
-              <button onClick={() => setLoadError(null)}>Dismiss</button>
-            </div>
-          )}
-          {!hasPdf && !loading && !loadError && (
-            <WelcomeScreen onFileLoaded={loadPdf} />
-          )}
-          {hasPdf && <Viewer pdf={activePdf} />}
-        </div>
-        {settingsOpen && !focusMode && (
-          <SettingsPanel onClose={() => setSettingsOpen(false)} />
-        )}
-      </div>
-      <StatusBar />
-    </div>
-  );
+      const kind=file.kind||(file.name.toLowerCase().endsWith('.epub')?'epub':'pdf');
+      if(!/\.(pdf|epub)$/i.test(file.name))throw new Error('Choose a PDF or EPUB file.');
+      const id=await documentId(file.data);await savePdfData(id,file.data);
+      const old=useStore.getState().library.find(d=>d.needsFile&&d.name===file.name);
+      if(old)useStore.getState().migrateDocument(old.id,id,file.name,kind);
+      upsert({id,name:file.name,kind,size:file.data.byteLength,needsFile:false});
+      openTab({path:id,name:file.name,kind});setLibraryOpen(false);
+    }catch(e){setError(`Import failed: ${e.message}`);}
+  },[openTab,upsert]);
+  const openLibraryFile=entry=>{openTab({path:entry.id,name:entry.name,kind:entry.kind});setLibraryOpen(false);};
+  async function removeFile(entry){try{await deletePdfData(entry.id);await deleteOcrPages(entry.id);useStore.getState().removeDocument(entry.id);}catch(e){setError(`Could not remove document: ${e.message}`);}}
+  useEffect(()=>{
+    const drop=async e=>{e.preventDefault();for(const file of Array.from(e.dataTransfer?.files||[])){try{await importFile({name:file.name,data:await file.arrayBuffer()});}catch(err){setError(err.message);}}};
+    const drag=e=>e.preventDefault();window.addEventListener('drop',drop);window.addEventListener('dragover',drag);
+    return()=>{window.removeEventListener('drop',drop);window.removeEventListener('dragover',drag);};
+  },[importFile]);
+  useKeyboardShortcuts({onNextPage:()=>tab&&setPage(tab.page+(useStore.getState().spread&&tab.kind!=='epub'?2:1)),onPrevPage:()=>tab&&setPage(tab.page-(useStore.getState().spread&&tab.kind!=='epub'?2:1))});
+  return <div className={`${styles.app} ${focus?styles.focusMode:''}`}>
+    <TopBar onToggleSidebar={()=>setSidebarOpen(s=>!s)} onToggleSettings={()=>setSettingsOpen(s=>!s)} settingsOpen={settingsOpen} onFileLoaded={importFile} onLibrary={()=>setLibraryOpen(s=>!s)}/>
+    <TabBar onFileLoaded={importFile}/>
+    {!libraryOpen&&tab&&<Toolbar onFileLoaded={importFile}/>}
+    {!libraryOpen&&doc&&<SearchBar pdf={doc}/>}
+    {!libraryOpen&&doc&&!focus&&<ReadingTools key={tab?.path} doc={doc}/>}
+    <div className={styles.body}>
+      {!libraryOpen&&doc&&sidebarOpen&&!focus&&<Sidebar pdf={doc} outline={tab?.outline} onClose={()=>setSidebarOpen(false)}/>}
+      <main className={styles.main}>
+        {error&&<div className={styles.errorBox} role="alert"><p>{error}</p><button onClick={()=>setError('')}>Dismiss</button></div>}
+        {(restoring||loading)&&<div className={styles.loadingOverlay} role="status"><div className={styles.spinner}/><p>{restoring?'Restoring library…':'Opening document…'}</p></div>}
+        {(libraryOpen||!tab)&&!restoring?<Library onImport={importFile} onOpen={openLibraryFile} onRemove={removeFile}/>:doc&&<Viewer pdf={doc}/>}
+      </main>
+      {!libraryOpen&&settingsOpen&&<SettingsPanel onClose={()=>setSettingsOpen(false)}/>}
+    </div><StatusBar/>
+  </div>;
 }

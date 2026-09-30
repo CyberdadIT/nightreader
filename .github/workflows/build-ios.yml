@@ -1,49 +1,33 @@
-name: Build iOS (Capacitor)
-
+name: Build iOS
 on:
+  pull_request:
+    branches: [main]
   push:
-    tags:
-      - "v*"
+    tags: ['v*']
   workflow_dispatch:
-
 permissions:
-  contents: write
-
+  contents: read
 jobs:
-  build-ios:
+  ios:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
-          cache: "npm"
-      - name: Install dependencies
-        run: npm install
-      - name: Build frontend
-        run: npm run build
-      - name: Sync Capacitor iOS
-        run: npx cap sync ios
-      - name: Install CocoaPods
-        run: |
-          cd ios/App
-          pod install || true
-      - name: Build iOS
-        run: |
-          cd ios/App
-          xcodebuild \
-            -workspace App.xcworkspace \
-            -scheme App \
-            -configuration Release \
-            -destination generic/platform=iOS \
-            -archivePath build/NightReader.xcarchive \
-            CODE_SIGN_IDENTITY="" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            archive || true
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync ios
+      - name: Compile unsigned iOS simulator app
+        run: >-
+          xcodebuild -workspace ios/App/App.xcworkspace -scheme App
+          -configuration Debug -sdk iphonesimulator
+          -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath ios/App/build
+          CODE_SIGNING_ALLOWED=NO build
       - uses: actions/upload-artifact@v4
         with:
-          name: nightreader-ios-${{ github.ref_name }}
-          path: ios/App/build/ipa/*.ipa
-          retention-days: 30
-          if-no-files-found: warn
+          name: nightreader-ios-simulator-review
+          path: ios/App/build/Build/Products/Debug-iphonesimulator/App.app
+          if-no-files-found: error

@@ -4,7 +4,7 @@ import styles from "./Sidebar.module.css";
 
 const TABS = ["Pages", "Contents", "Bookmarks"];
 
-export default function Sidebar({ pdf, outline }) {
+export default function Sidebar({ pdf, outline, onClose }) {
   const [tab, setTab]                  = useState(0);
   const [resolvedOutline, setResolved] = useState([]);
   const [thumbnails, setThumbnails]    = useState({});
@@ -34,6 +34,7 @@ export default function Sidebar({ pdf, outline }) {
 
   // ── Resolve TOC destinations ──────────────────────────────────────────
   useEffect(() => {
+    if (pdf?.kind === "epub") { setResolved(outline || []); return; }
     if (!pdf || !outline || outline.length === 0) { setResolved([]); return; }
     let cancelled = false;
 
@@ -64,7 +65,7 @@ export default function Sidebar({ pdf, outline }) {
 
   // ── Render page thumbnails for current PDF ────────────────────────────
   useEffect(() => {
-    if (!pdf || tab !== 0) return;
+    if (!pdf || pdf.kind === "epub" || tab !== 0) return;
     let cancelled = false;
 
     async function renderThumbs() {
@@ -113,6 +114,7 @@ export default function Sidebar({ pdf, outline }) {
 
   return (
     <aside className={styles.sidebar} aria-label="Document sidebar">
+      <button onClick={onClose} style={{padding:8,background:"var(--panel)",color:"var(--text)",border:0}} aria-label="Close sidebar">Close sidebar</button>
       <div className={styles.tabs} role="tablist">
         {TABS.map((label, i) => (
           <button
@@ -160,7 +162,7 @@ export default function Sidebar({ pdf, outline }) {
                       </div>
                     )}
                   </div>
-                  <span className={styles.thumbLabel}>{n}</span>
+                  <span className={styles.thumbLabel}>{pdf?.kind === "epub" ? `Chapter ${n}` : n}</span>
                 </div>
               );
             })}

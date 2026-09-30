@@ -71,3 +71,8 @@ coverage/
 keystore.properties
 google-services.json
 GoogleService-Info.plist
+
+# Generated OCR assets
+public/ocr/
+playwright-report/
+test-results/

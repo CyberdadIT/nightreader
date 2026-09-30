@@ -27,6 +27,13 @@ export default function Toolbar({ onFileLoaded }) {
   const toggleFocusMode  = useStore((s) => s.toggleFocusMode);
   const addBookmark      = useStore((s) => s.addBookmark);
 
+  const fit = useStore(s => s.fitMode);
+  const setFit = useStore(s => s.setFitMode);
+  const rotate = useStore(s => s.rotate);
+  const spread = useStore(s => s.spread);
+  const toggleSpread = useStore(s => s.toggleSpread);
+  const epub = activeTab?.kind === "epub";
+  const step = spread && !epub ? 2 : 1;
   const zoomPct = Math.round(zoom * 100);
 
   // Jump to next/previous zoom step
@@ -69,22 +76,22 @@ export default function Toolbar({ onFileLoaded }) {
 
       {/* Page navigation */}
       <div className={styles.group}>
-        <button className={styles.btn} onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage <= 1} title="Previous page (←)">◀</button>
+        <button className={styles.btn} onClick={() => setCurrentPage(currentPage - step)} disabled={currentPage <= 1} title="Previous page (←)">◀</button>
         <input
           className={styles.pageInput}
           type="number" min={1} max={totalPages || 1}
           value={currentPage}
           onChange={handlePageInput}
-          aria-label="Current page"
+          aria-label={epub ? "Current chapter" : "Current page"}
         />
         <span className={styles.pageOf}>/ {totalPages || "—"}</span>
-        <button className={styles.btn} onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage >= totalPages} title="Next page (→)">▶</button>
+        <button className={styles.btn} onClick={() => setCurrentPage(currentPage + step)} disabled={currentPage >= totalPages} title="Next page (→)">▶</button>
       </div>
 
       <div className={styles.sep} />
 
       {/* Zoom controls */}
-      <div className={styles.group}>
+      {!epub && <div className={styles.group}>
         <button
           className={styles.zoomBtn}
           onClick={zoomOut}
@@ -133,7 +140,10 @@ export default function Toolbar({ onFileLoaded }) {
         >
           100%
         </button>
-      </div>
+        <select className={styles.zoomSelect} aria-label="Page fit" value={fit} onChange={e => setFit(e.target.value)}><option value="width">Fit to width</option><option value="page">Fit to page</option><option value="manual">Custom zoom</option></select>
+        <button className={styles.btn} onClick={rotate}>Rotate</button>
+        <button className={styles.btn} onClick={toggleSpread} aria-pressed={spread}>Two pages</button>
+      </div>}
 
       <div className={styles.sep} />
 
@@ -148,14 +158,14 @@ export default function Toolbar({ onFileLoaded }) {
 
       {/* View */}
       <div className={styles.group}>
-        <button className={`${styles.btn} ${scrollMode ? styles.active : ""}`} onClick={toggleScrollMode} title="Continuous scroll">☰ Scroll</button>
+        {!epub && <button className={`${styles.btn} ${scrollMode ? styles.active : ""}`} onClick={toggleScrollMode} title="Continuous scroll">☰ Scroll</button>}
         <button className={`${styles.btn} ${invertColors ? styles.active : ""}`} onClick={toggleInvert} title="Invert colours">◑ Invert</button>
         <button className={styles.btn} onClick={toggleFocusMode} title="Focus mode (R)">▭ Focus</button>
       </div>
 
       <div className={styles.spacer} />
 
-      <button className={`${styles.btn} ${styles.openBtn}`} onClick={handleOpen}>📂 Open PDF</button>
+      <button className={`${styles.btn} ${styles.openBtn}`} onClick={handleOpen}>Open document</button>
     </div>
   );
 }

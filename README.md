@@ -2,35 +2,38 @@
 
 > An open-source, cross-platform PDF reader built for night owls.
 
-[![CI](https://github.com/your-org/nightreader/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/nightreader/actions/workflows/ci.yml)
+[![CI](https://github.com/CyberdadIT/nightreader/actions/workflows/ci.yml/badge.svg)](https://github.com/CyberdadIT/nightreader/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 
 ---
 
 ## Features
 
-- **5 reading modes** — Dark, Light, Sepia, AMOLED, Matrix (green)
-- **Real PDF rendering** via Mozilla PDF.js — fonts, images, vector graphics
-- **Selectable text** with text-layer overlay on every page
-- **Annotations** — highlight in 4 colours, underline, strikethrough, notes
-- **Bookmarks** — save and jump to any page
-- **Table of contents** — extracted from PDF outline
-- **Find in document** — full-text search with match highlighting
-- **Continuous scroll** or single-page mode
-- **Focus mode** — hides all chrome for distraction-free reading
-- **Fine display controls** — font size, line height, margins, brightness
-- **Font switching** — Serif, Sans, Monospace
-- **Drag and drop** PDF files
-- **Recent files** list
-- **Keyboard shortcuts** — full navigation without a mouse
-- **Persistent settings** — remembers your preferences between sessions
+- Nine reading modes, multiple document tabs and session restoration.
+- Local PDF/DRM-free EPUB library, collections and saved reading position.
+- Visible highlights, underlines, strikeouts and editable notes.
+- Markdown and printable HTML note exports.
+- Native read aloud on Windows, Android and iOS, with voice/speed controls.
+- Bundled English OCR for scanned PDF text selection, search and speech.
+- Fit to width/page, rotation, two-page reading and memory-bounded continuous PDF scrolling.
+- Reflowable EPUB chapters with adjustable fonts and spacing.
+- Search with visible matches, bookmarks, thumbnails and contents.
+
+Read [release details and platform validation](docs/RELEASE-0.5.md) for supported formats, OCR/speech behaviour, local-storage limits and native build instructions. Windows, Android and iOS are the priority targets; Linux releases are deferred.
 
 ---
 
 ## Platform support
 
-| Platform | Technology     | Distribution                      |
-|----------|----------------|-----------------------------------|
+| Platform | Technology | Review build |
+|---|---|---|
+| Windows | Tauri + React | MSI / EXE |
+| Android | Capacitor | Debug APK |
+| iOS | Capacitor | Unsigned simulator app; device distribution requires Apple signing |
+
+Native device acceptance remains required before a production release.
+
+----------|----------------|-----------------------------------|
 | Windows  | Tauri + React  | `.msi` / `.exe` via GitHub Releases |
 | Linux    | Tauri + React  | `.deb` / `.AppImage` / Flathub    |
 | macOS    | Tauri + React  | `.dmg` via GitHub Releases        |
@@ -43,7 +46,7 @@
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org) 20+
+- [Node.js](https://nodejs.org) 22+
 - [Rust](https://rustup.rs) stable (for desktop builds)
 - [Android Studio](https://developer.android.com/studio) (for Android builds)
 - [Xcode](https://developer.apple.com/xcode/) 15+ on macOS (for iOS builds)
@@ -51,9 +54,9 @@
 ### Install dependencies
 
 ```bash
-git clone https://github.com/your-org/nightreader.git
+git clone https://github.com/CyberdadIT/nightreader.git
 cd nightreader
-npm install
+npm ci
 ```
 
 ### Run in the browser (development)
@@ -72,7 +75,7 @@ npm run tauri:dev
 ### Build desktop installers
 
 ```bash
-npm run tauri:build
+npm run tauri:build -- --config src-tauri/tauri.windows.conf.json
 # Output: src-tauri/target/release/bundle/
 ```
 
@@ -189,12 +192,7 @@ git tag v0.2.0
 git push origin v0.2.0
 ```
 
-GitHub Actions automatically:
-- Builds Windows `.msi` + `.exe`, Linux `.deb` + `.AppImage`, macOS `.dmg`
-- Builds Android debug `.apk` and release `.aab`
-- Creates a **draft** GitHub Release with all artifacts attached
-
-Review the draft release on GitHub, add release notes, and publish.
+GitHub Actions validates the frontend and builds Windows installers, an Android debug APK and an unsigned iOS simulator app. These are review artifacts. Production Android/iOS distribution requires signing and platform-specific checks; see the release guide above.
 
 ---
 
