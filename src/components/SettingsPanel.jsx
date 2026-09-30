@@ -3,6 +3,9 @@ import { notesMarkdown, notesHtml } from "../utils/export.js";
 import { saveTextFile } from "../utils/platform.js";
 import { useStore } from "../store/useStore.js";
 import styles from "./SettingsPanel.module.css";
+import { TagInput } from "./NotesLibrary.jsx";
+import { ankiFlashcards } from "../utils/notes.js";
+import { saveAnnotatedPdf } from "../utils/annotatedPdf.js";
 
 const MODES = [
   { id: "dark",          label: "Dark",           bg: "#1a1f2a", fg: "#e6edf3" },
@@ -39,6 +42,10 @@ export default function SettingsPanel({ onClose }) {
   const activeTab = useStore((s) => s.getActiveTab());
   const filePath = activeTab?.path ?? null;
   const invertColors = useStore((s) => s.invertColors);
+  const warmth = useStore((s) => s.warmth);
+  const warmSchedule = useStore((s) => s.warmSchedule);
+  const setWarmth = useStore((s) => s.setWarmth);
+  const setWarmSchedule = useStore((s) => s.setWarmSchedule);
 
   const setReadingMode   = useStore((s) => s.setReadingMode);
   const setFontSize      = useStore((s) => s.setFontSize);
@@ -48,12 +55,25 @@ export default function SettingsPanel({ onClose }) {
   const setHlColor       = useStore((s) => s.setHlColor);
   const toggleInvert     = useStore((s) => s.toggleInvert);
   const removeAnnotation = useStore((s) => s.removeAnnotation);
+  const updateAnnotation = useStore((s) => s.updateAnnotation);
+  const [exportMessage, setExportMessage] = useState("");
 
   const fileAnnotations = annotations.filter((a) => a.filePath === filePath);
 
   async function exportNotes(format) {
     try {
-      setExportError("");
+      setExportError(""); setExportMessage("");
+      if (format === "anki") {
+        const doc = { name: activeTab?.name, kind: activeTab?.kind };
+        await saveTextFile(`${(activeTab?.name || "document").replace(/[^a-zA-Z0-9._-]/g, "_")}-flashcards.txt`, ankiFlashcards(fileAnnotations.map(a => ({ ...a, document: doc }))));
+        setExportMessage("Flashcards saved. In Anki, choose File → Import and pick the file.");
+        return;
+      }
+      if (format === "pdf") {
+        const { written, skipped } = await saveAnnotatedPdf(activeTab, fileAnnotations);
+        if (written !== null) setExportMessage(`Saved a copy with ${written} annotation${written === 1 ? "" : "s"}${skipped ? `. ${skipped} older note${skipped === 1 ? "" : "s"} without saved positions ${skipped === 1 ? "was" : "were"} left out; re-highlight ${skipped === 1 ? "it" : "them"} to include ${skipped === 1 ? "it" : "them"}` : ""}.`);
+        return;
+      }
       const name = (activeTab?.name || "document").replace(/[^a-zA-Z0-9._-]/g,"_");
       const printable = format === "html";
       await saveTextFile(`${name}-notes.${format}`, printable ? notesHtml(activeTab?.name, fileAnnotations, activeTab?.kind) : notesMarkdown(activeTab?.name, fileAnnotations, activeTab?.kind), printable ? "text/html" : "text/markdown");
@@ -108,11 +128,25 @@ export default function SettingsPanel({ onClose }) {
 
         {/* Sliders */}
         <section className={styles.section}>
-          <SliderRow label="Brightness" min={10}  max={100} value={brightness}               display={`${brightness}%`}           onChange={setBrightness} />
+          <SliderRow label="Brightness" min={5}   max={100} value={brightness}               display={`${brightness}%`}           onChange={setBrightness} />
           {activeTab?.kind === "epub" && <><label>Font<select aria-label="EPUB font" value={font} onChange={e => setFont(e.target.value)}><option value="serif">Serif</option><option value="sans">Sans</option><option value="mono">Monospace</option></select></label>
           <SliderRow label="Font size"  min={12}  max={24}  value={fontSize}                 display={`${fontSize}px`}            onChange={setFontSize} />
           <SliderRow label="Line height" min={14} max={30}  value={Math.round(lineHeight*10)} display={(lineHeight).toFixed(1)}    onChange={(v) => setLineHeight(v/10)} /></>}
           <SliderRow label="Margins"    min={16}  max={80}  value={margin}                   display={`${margin}px`}              onChange={setMargin} />
+        </section>
+
+        {/* Warm light */}
+        <section className={styles.section}>
+          <h3 className={styles.sectionTitle}>Warm light</h3>
+          <SliderRow label="Warmth" min={0} max={100} value={warmth} display={warmth ? `${warmth}%` : "Off"} onChange={setWarmth} />
+          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--muted)", marginTop: 8 }}>
+            <input type="checkbox" checked={warmSchedule.enabled} onChange={e => setWarmSchedule({ enabled: e.target.checked })} />
+            Only in the evening
+          </label>
+          {warmSchedule.enabled && <div style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, color: "var(--muted)", marginTop: 6, flexWrap: "wrap" }}>
+            From <input type="time" className={styles.timeInput} aria-label="Warm light starts" value={warmSchedule.start} onChange={e => setWarmSchedule({ start: e.target.value })} />
+            to <input type="time" className={styles.timeInput} aria-label="Warm light ends" value={warmSchedule.end} onChange={e => setWarmSchedule({ end: e.target.value })} />
+          </div>}
         </section>
 
         {/* Highlight colour */}
@@ -134,8 +168,9 @@ export default function SettingsPanel({ onClose }) {
         {/* Annotations */}
         <section className={styles.annotSection}>
           <h3 className={styles.sectionTitle}>Annotations ({fileAnnotations.length})</h3>
-          <div className="exportActions"><button disabled={!fileAnnotations.length} onClick={() => exportNotes("md")}>Export Markdown</button><button disabled={!fileAnnotations.length} onClick={() => exportNotes("html")}>Export printable HTML</button></div>
+          <div className="exportActions"><button disabled={!fileAnnotations.length} onClick={() => exportNotes("md")}>Export Markdown</button><button disabled={!fileAnnotations.length} onClick={() => exportNotes("html")}>Export printable HTML</button><button disabled={!fileAnnotations.length} onClick={() => exportNotes("anki")}>Export flashcards (Anki)</button>{activeTab?.kind !== "epub" && <button disabled={!fileAnnotations.length} onClick={() => exportNotes("pdf")}>Save annotated PDF copy</button>}</div>
           {exportError && <p role="alert">{exportError}</p>}
+          {exportMessage && <p role="status" style={{ fontSize: 12, color: "var(--muted)" }}>{exportMessage}</p>}
           {fileAnnotations.length === 0 ? (
             <p className={styles.empty}>
               Open a PDF and select text to add highlights and annotations.
@@ -147,6 +182,7 @@ export default function SettingsPanel({ onClose }) {
                   "{a.quote.slice(0, 90)}{a.quote.length > 90 ? "…" : ""}"
                 </button>
                 <textarea aria-label={`Note for ${activeTab?.kind === "epub" ? "chapter" : "page"} ${a.page}`} value={a.note || ""} placeholder="Add your note…" onChange={e => updateNote(a.id, e.target.value)} rows={3}/>
+                <TagInput tags={a.tags || []} onChange={tags => updateAnnotation(a.id, { tags })} label={`Tags for ${activeTab?.kind === "epub" ? "chapter" : "page"} ${a.page}`} />
                 <div className={styles.annotMeta}>
                   <span>{activeTab?.kind === "epub" ? "Chapter" : "Page"} {a.page}</span>
                   <button

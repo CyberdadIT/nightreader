@@ -35,3 +35,29 @@ export async function saveTextFile(name, text, mime = 'text/plain') {
   const a=document.createElement('a'); a.href=url; a.download=name; a.click();
   setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
+function toBase64(bytes) {
+  let binary=''; for(let i=0;i<bytes.length;i+=0x8000) binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+  return btoa(binary);
+}
+/** Save a binary file (e.g. a PDF). Returns false if the user cancelled. */
+export async function saveBinaryFile(name, bytes, mime = 'application/octet-stream') {
+  if (isCapacitor()) {
+    const {Filesystem,Directory} = await import('@capacitor/filesystem');
+    const {Share} = await import('@capacitor/share');
+    await Filesystem.writeFile({path:name,data:toBase64(bytes),directory:Directory.Cache});
+    const {uri}=await Filesystem.getUri({path:name,directory:Directory.Cache});
+    await Share.share({title:name,url:uri}); return true;
+  }
+  if (isTauri()) {
+    const {save}=await import('@tauri-apps/plugin-dialog');
+    const {writeFile}=await import('@tauri-apps/plugin-fs');
+    const ext=name.split('.').pop();
+    const path=await save({defaultPath:name,filters:[{name:ext.toUpperCase(),extensions:[ext]}]});
+    if(!path) return false;
+    await writeFile(path,bytes); return true;
+  }
+  const url=URL.createObjectURL(new Blob([bytes],{type:mime}));
+  const a=document.createElement('a'); a.href=url; a.download=name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  return true;
+}

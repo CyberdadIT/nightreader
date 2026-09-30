@@ -18,8 +18,13 @@
 - Fit to width/page, rotation, two-page reading and memory-bounded continuous PDF scrolling.
 - Reflowable EPUB chapters with adjustable fonts and spacing.
 - Search with visible matches, bookmarks, thumbnails and contents.
+- Offline dictionary (WordNet) for any selected word.
+- All-notes view across the library with tags, colour filters and Anki flashcard export.
+- Annotated PDF copies with highlights and notes written in as standard PDF annotations.
+- Continuous read aloud with a sleep timer; warm light with an evening schedule; time-left estimates.
+- Windows: "Open with" integration, single window, folder sync (e.g. OneDrive) and new-version notices.
 
-Read [release details and platform validation](docs/RELEASE-0.5.md) for supported formats, OCR/speech behaviour, local-storage limits and native build instructions. Windows, Android and iOS are the priority targets; Linux releases are deferred.
+Read [release details](docs/RELEASE-0.6.md) and the [0.5 platform validation notes](docs/RELEASE-0.5.md) for supported formats, OCR/speech behaviour, local-storage limits and native build instructions. Windows, Android and iOS are the priority targets; Linux releases are deferred.
 
 ---
 
@@ -172,12 +177,16 @@ nightreader/
 |---|---|
 | `← / →` | Previous / Next page |
 | `PageUp / PageDown` | Previous / Next page |
-| `Space` | Next page |
+| `↑ / ↓` | Scroll; at the edge, previous / next page |
+| `Space` | Scroll down a screen; at the bottom, next page |
+| Mouse wheel | Scroll; one more notch at the edge turns the page |
+| `Ctrl + mouse wheel` | Zoom a PDF / resize EPUB text |
 | `+ / −` | Zoom in / out |
 | `Ctrl + 0` | Reset zoom |
 | `Ctrl + F` | Find in document |
 | `R` | Toggle focus mode |
-| `Esc` | Close search / exit focus mode |
+| `Esc` | Close search or a dialog |
+| `?` | Show all shortcuts in the app |
 
 ---
 
@@ -230,4 +239,7 @@ All forks and derivatives must also be open source under the same licence.
 - [Tauri](https://tauri.app) — lightweight Rust-based desktop shell
 - [Capacitor](https://capacitorjs.com) — Ionic's native mobile bridge
 - [Zustand](https://github.com/pmndrs/zustand) — minimal React state management
+- [WordNet](https://wordnet.princeton.edu) — offline dictionary data, © 2006 Princeton University, used under the WordNet licence
+- [pdf-lib](https://pdf-lib.js.org) — writing annotations into PDF copies
+- [Tesseract.js](https://tesseract.projectnaptha.com) — offline text recognition
 - Inspired by [Readera](https://readera.org) and [Foxit Reader](https://www.foxit.com)

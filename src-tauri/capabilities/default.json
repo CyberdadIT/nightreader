@@ -1,1 +1,1 @@
-{"identifier":"default","description":"Reader window and user-selected note exports","windows":["main"],"permissions":["core:default","dialog:allow-save","fs:allow-write-text-file"]}
+{"identifier": "default", "description": "Reader window: user-chosen note exports, annotated PDF copies, sync folder choice and opening release pages", "windows": ["main"], "permissions": ["core:default", "dialog:allow-save", "dialog:allow-open", "fs:allow-write-text-file", "fs:allow-write-file", "opener:default"]}

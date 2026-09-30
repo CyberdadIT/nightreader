@@ -72,7 +72,8 @@ keystore.properties
 google-services.json
 GoogleService-Info.plist
 
-# Generated OCR assets
+# Generated OCR and dictionary assets
 public/ocr/
+public/dictionary/
 playwright-report/
 test-results/

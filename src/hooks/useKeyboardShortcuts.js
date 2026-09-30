@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useStore } from "../store/useStore.js";
 import { stepZoom } from "../utils/navigation.js";
 
-export function useKeyboardShortcuts({ onNextPage, onPrevPage }) {
+export function useKeyboardShortcuts({ onNextPage, onPrevPage, onHelp }) {
   const toggleSearch    = useStore((s) => s.toggleSearch);
   const toggleFocusMode = useStore((s) => s.toggleFocusMode);
   const setZoom         = useStore((s) => s.setZoom);
@@ -14,6 +14,9 @@ export function useKeyboardShortcuts({ onNextPage, onPrevPage }) {
     const handler = (e) => {
       const tag = document.activeElement?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      // Dialogs handle their own keys.
+      if (document.querySelector('[aria-modal="true"]')) return;
+      if (e.key === "?") { e.preventDefault(); onHelp?.(); return; }
 
       // Find the scrollable viewer container
       const viewerEl = document.querySelector("[data-viewer-scroll]");
@@ -131,5 +134,5 @@ export function useKeyboardShortcuts({ onNextPage, onPrevPage }) {
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onNextPage, onPrevPage, toggleSearch, toggleFocusMode, setZoom, zoom, searchVisible, scrollMode]);
+  }, [onNextPage, onPrevPage, onHelp, toggleSearch, toggleFocusMode, setZoom, zoom, searchVisible, scrollMode]);
 }

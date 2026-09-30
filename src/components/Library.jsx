@@ -2,15 +2,20 @@ import React,{useState} from 'react';
 import {useStore} from '../store/useStore.js';
 import {openFilePicker} from '../utils/platform.js';
 import styles from './Library.module.css';
-export default function Library({onImport,onOpen,onRemove}) {
+import NotesLibrary from './NotesLibrary.jsx';
+export default function Library({onImport,onOpen,onRemove,onJump}) {
   const library=useStore(s=>s.library), collections=useStore(s=>s.collections);
   const update=useStore(s=>s.updateDocument), addCollection=useStore(s=>s.addCollection);
-  const [query,setQuery]=useState(''),[filter,setFilter]=useState(''),[newCollection,setNewCollection]=useState(''),[removing,setRemoving]=useState(null),[error,setError]=useState('');
+  const [view,setView]=useState('documents'),[query,setQuery]=useState(''),[filter,setFilter]=useState(''),[newCollection,setNewCollection]=useState(''),[removing,setRemoving]=useState(null),[error,setError]=useState('');
   async function importDocument(){try{const f=await openFilePicker();if(f)await onImport(f);}catch(e){setError(e.message);}}
   const documents=library.filter(d=>d.name.toLowerCase().includes(query.toLowerCase())&&(!filter||d.collection===filter));
   return <section className={styles.library} aria-label="Document library">
     <header className={styles.header}><div><h1>Your reading library</h1><p>PDFs and EPUBs stay on this device, even after you close their tabs.</p></div><button onClick={importDocument}>Import PDF or EPUB</button></header>
     {error&&<p role="alert">{error}</p>}
+    <div role="tablist" aria-label="Library view" style={{display:'flex',gap:8,marginBottom:16}}>
+      {[['documents','Documents'],['notes','All notes']].map(([id,label])=><button key={id} role="tab" aria-selected={view===id} onClick={()=>setView(id)} style={view===id?{borderColor:'var(--accent)',color:'var(--accent)'}:undefined}>{label}</button>)}
+    </div>
+    {view==='notes'?<NotesLibrary onJump={onJump}/>:<>
     <div className={styles.filters}>
       <input aria-label="Search library" placeholder="Search documents…" value={query} onChange={e=>setQuery(e.target.value)}/>
       <select aria-label="Filter collection" value={filter} onChange={e=>setFilter(e.target.value)}><option value="">All collections</option>{collections.map(c=><option key={c}>{c}</option>)}</select>
@@ -24,6 +29,7 @@ export default function Library({onImport,onOpen,onRemove}) {
       <div className={styles.actions}><button onClick={()=>d.needsFile?importDocument():onOpen(d)}>{d.needsFile?'Locate file':'Continue reading'}</button><button onClick={()=>setRemoving(d.id)}>Remove</button></div>
       {removing===d.id&&<div role="alert"><p>Remove this document and its local notes and OCR? The original file stays unchanged.</p><button onClick={async()=>{await onRemove(d);setRemoving(null);}}>Remove from device</button><button onClick={()=>setRemoving(null)}>Cancel</button></div>}
     </article>)}</div>
+    </>}
     <p className={styles.footnote}>Local storage can be cleared by the operating system or app data reset. Keep your original documents and export important notes.</p>
   </section>;
 }

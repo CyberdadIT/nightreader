@@ -3,7 +3,7 @@ import { useStore } from "../store/useStore.js";
 import { openFilePicker } from "../utils/platform.js";
 import styles from "./TopBar.module.css";
 
-export default function TopBar({ onToggleSidebar, onToggleSettings, settingsOpen, onFileLoaded, onLibrary }) {
+export default function TopBar({ onToggleSidebar, onToggleSettings, settingsOpen, onFileLoaded, onLibrary, onAppSettings, onShortcuts }) {
   const activeTab       = useStore((s) => s.getActiveTab());
   const fileName        = activeTab?.name ?? null;
   const focusMode       = useStore((s) => s.focusMode);
@@ -35,6 +35,8 @@ export default function TopBar({ onToggleSidebar, onToggleSettings, settingsOpen
         <button className={styles.btn} onClick={onToggleSidebar} title="Toggle sidebar">▤ Sidebar</button>
         <button className={`${styles.btn} ${settingsOpen ? styles.btnActive : ""}`} onClick={onToggleSettings} title="Settings">☰ Notes</button>
         <button className={styles.btn} onClick={toggleFocusMode} title="Focus mode (R)">▭ Focus</button>
+        <button className={styles.btn} onClick={onShortcuts} title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
+        <button className={styles.btn} onClick={onAppSettings} title="Sync, updates and help" aria-label="App settings">⚙</button>
         <button className={`${styles.btn} ${styles.openBtn}`} onClick={handleOpen}>Open document</button>
       </nav>
     </header>

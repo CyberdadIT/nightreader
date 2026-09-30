@@ -48,9 +48,9 @@ When it finishes you will find:
 ```
 src-tauri\target\release\bundle\
   msi\
-    NightReader_0.5.0_x64_en-US.msi    ← Windows Installer package
+    NightReader_0.6.0_x64_en-US.msi    ← Windows Installer package
   nsis\
-    NightReader_0.5.0_x64-setup.exe    ← Standalone setup wizard
+    NightReader_0.6.0_x64-setup.exe    ← Standalone setup wizard
 ```
 
 Distribute either file. Both install NightReader to `%PROGRAMFILES%\NightReader`.
@@ -122,10 +122,10 @@ cargo --version     # should print cargo 1.x.x
 
 ```cmd
 :: Silent MSI install (no UI)
-msiexec /i NightReader_0.5.0_x64_en-US.msi /quiet /norestart
+msiexec /i NightReader_0.6.0_x64_en-US.msi /quiet /norestart
 
 :: Silent MSI uninstall
-msiexec /x NightReader_0.5.0_x64_en-US.msi /quiet /norestart
+msiexec /x NightReader_0.6.0_x64_en-US.msi /quiet /norestart
 ```
 
 ---

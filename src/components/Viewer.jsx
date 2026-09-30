@@ -4,16 +4,18 @@ import {selectionAnchor} from '../utils/annotations.js';
 import {stepZoom,wheelPageTurn,wheelPixels} from '../utils/navigation.js';
 import PdfPage from './PdfPage.jsx';
 import EpubChapter from './EpubChapter.jsx';
+import DefinitionCard from './DefinitionCard.jsx';
+import {isSingleWord} from '../utils/dictionary.js';
 import styles from './Viewer.module.css';
 export default function Viewer({pdf}) {
   const container=useRef(null),scrollPage=useRef(null), ignoreScrollUntil=useRef(0);
   const tab=useStore(s=>s.getActiveTab()),scroll=useStore(s=>s.scrollMode),spread=useStore(s=>s.spread),brightness=useStore(s=>s.brightness),mode=useStore(s=>s.readingMode);
   const navigationVersion=useStore(s=>s.navigationVersion);
-  const page=tab?.page||1,[size,setSize]=useState({width:800,height:600}),[popup,setPopup]=useState(null),[message,setMessage]=useState('');
+  const page=tab?.page||1,[size,setSize]=useState({width:800,height:600}),[popup,setPopup]=useState(null),[lookup,setLookup]=useState(null),[message,setMessage]=useState('');
   useEffect(()=>{
     const el=container.current;const observer=new ResizeObserver(()=>setSize({width:el.clientWidth-32,height:el.clientHeight-32}));observer.observe(el);return()=>observer.disconnect();
   },[]);
-  useEffect(()=>{setPopup(null);},[tab?.path,page,pdf]);
+  useEffect(()=>{setPopup(null);setLookup(null);},[tab?.path,page,pdf]);
   // Page-by-page view: start each new page at the top, or at the bottom when
   // the wheel moved back from the next page, so reading flows continuously.
   const enterEdge=useRef(null);
@@ -90,10 +92,12 @@ export default function Viewer({pdf}) {
   }
   const pages=scroll?Array.from({length:pdf.numPages},(_,i)=>i+1):spread?[page,...(page<pdf.numPages?[page+1]:[])]:[page];
   return <div style={{flex:1,minHeight:0,position:'relative',display:'flex',flexDirection:'column'}}>
-    <div aria-hidden="true" style={{position:'absolute',inset:0,background:`rgba(0,0,0,${(100-brightness)/120})`,pointerEvents:'none',zIndex:20}}/>
+    <div aria-hidden="true" style={{position:'absolute',inset:0,background:`rgba(0,0,0,${(100-brightness)/110})`,pointerEvents:'none',zIndex:20}}/>
     {message&&<p role="status">{message}</p>}
+    {lookup&&<DefinitionCard {...lookup} onClose={()=>setLookup(null)}/>}
     {popup&&<div className="selectionPopup" role="toolbar" aria-label="Selected text actions" style={{position:'fixed',left:Math.max(8,Math.min(popup.x,window.innerWidth-290)),top:Math.max(8,Math.min(popup.y+8,window.innerHeight-100)),zIndex:300}} onPointerDown={e=>e.preventDefault()}>
       <button onClick={async()=>{try{await navigator.clipboard.writeText(popup.quote);setPopup(null);}catch{setMessage('Clipboard is unavailable. Use your device copy command.');}}}>Copy</button>
+      {isSingleWord(popup.quote)&&<button onClick={()=>{setLookup({word:popup.quote.trim(),x:popup.x,y:popup.y});setPopup(null);}}>Define</button>}
       {['yellow','blue','pink','green'].map(c=><button key={c} aria-label={`Highlight ${c}`} onClick={()=>annotate(`hl-${c}`)} style={{background:{yellow:'#ffdf00',blue:'#4fc3f7',pink:'#f48fb1',green:'#a5d6a7'}[c],color:'#111'}}>●</button>)}
       <button onClick={()=>annotate('underline')}>Underline</button><button onClick={()=>annotate('strikethrough')}>Strike</button><button onClick={()=>annotate('note')}>Note</button><button aria-label="Close selection actions" onClick={()=>{setPopup(null);window.getSelection()?.removeAllRanges();}}>×</button>
     </div>}

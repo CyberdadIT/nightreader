@@ -1,1 +1,1 @@
-{}
+{"default":{"identifier":"default","description":"Reader window: user-chosen note exports, annotated PDF copies, sync folder choice and opening release pages","local":true,"windows":["main"],"permissions":["core:default","dialog:allow-save","dialog:allow-open","fs:allow-write-text-file","fs:allow-write-file","opener:default"]}}

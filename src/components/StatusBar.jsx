@@ -1,15 +1,18 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useStore } from "../store/useStore.js";
+import { countWords, formatDuration, paceFor, timeLeft, DEFAULT_SECONDS_PER_PAGE, DEFAULT_WPM } from "../utils/pace.js";
 import styles from "./StatusBar.module.css";
 
-export default function StatusBar() {
+export default function StatusBar({ doc }) {
   const activeTab    = useStore((s) => s.getActiveTab());
   const currentPage  = activeTab?.page ?? 1;
   const totalPages   = activeTab?.totalPages ?? 0;
   const readingMode  = useStore((s) => s.readingMode);
   const focusMode    = useStore((s) => s.focusMode);
   const tabs         = useStore((s) => s.tabs);
+  const readingPace  = useStore((s) => s.readingPace);
   const [time, setTime] = useState("");
+  const chapterWords = useMemo(() => doc?.kind === "epub" ? (doc.chapters || []).map(c => countWords(c.text)) : [], [doc]);
 
   useEffect(() => {
     function tick() {
@@ -23,6 +26,15 @@ export default function StatusBar() {
   if (focusMode) return null;
 
   const pct = totalPages > 0 ? Math.round((currentPage / totalPages) * 100) : 0;
+  const epub = activeTab?.kind === "epub";
+  const left = doc && activeTab ? timeLeft({
+    kind: epub ? "epub" : "pdf", page: currentPage, total: totalPages, chapterWords,
+    secondsPerPage: paceFor(readingPace, activeTab.path, "secondsPerPage", DEFAULT_SECONDS_PER_PAGE),
+    wpm: paceFor(readingPace, activeTab.path, "wpm", DEFAULT_WPM),
+  }) : null;
+  const leftText = !left ? "" : epub
+    ? `about ${formatDuration(left.chapter)} left in chapter · ${formatDuration(left.book)} in book`
+    : `about ${formatDuration(left.book)} left`;
   const remaining = totalPages > 0 ? totalPages - currentPage : 0;
   const modeLabel = {
     dark: "☽ Dark", light: "☀ Light", sepia: "☕ Sepia",
@@ -46,6 +58,7 @@ export default function StatusBar() {
       <div className={styles.progress} title={`${pct}% read`}>
         <div className={styles.progressBar} style={{ width: `${pct}%` }} />
       </div>
+      {totalPages > 0 && <span className={styles.item} data-time-left title="Based on your reading pace">{pct}% · {leftText}</span>}
       <div className={styles.spacer} />
 
       {time && (

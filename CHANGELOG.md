@@ -1,10 +1,29 @@
 # Changelog
 
-## [Unreleased]
+## [0.6.0] — easier on Windows, kinder at night, better for study
 
-- Fixed mouse-wheel scrolling on desktop. In page-by-page and two-page views the wheel now scrolls through the page and turns to the next or previous page at the bottom or top edge. Pages that fit entirely on screen turn with a single notch.
-- Added Ctrl + mouse wheel (or trackpad pinch) to zoom PDFs and resize EPUB text.
-- Trackpad momentum no longer skips several pages after a page turn.
+### Windows
+- NightReader now appears under "Open with" for PDF and EPUB files, and double-clicking a file opens it in NightReader when it's your default.
+- Opening a second file while NightReader is running adds it as a tab in the same window instead of starting another copy.
+- A banner tells you when a new version is on GitHub, with a link to download it. Checked at most once a day; you can turn it off in ⚙ Settings.
+- Folder sync: choose a folder such as OneDrive and your reading positions, highlights and notes are kept in step through it.
+
+### Reading
+- Mouse wheel now scrolls through a page and turns to the next or previous page at the bottom or top edge, in page-by-page and two-page views. Ctrl + wheel zooms PDFs and resizes EPUB text.
+- Password-protected PDFs ask for their password. It is kept only until you close the app.
+- Read aloud carries on to the next page or chapter, skipping blank pages, with a sleep timer (15–90 minutes, or end of the current page/chapter).
+- Warm light removes blue light from the whole window, optionally only during evening hours. Brightness goes lower than before.
+- The status bar shows how far through you are and roughly how long is left, based on your own reading pace.
+- Press ? for a list of keyboard and mouse shortcuts.
+
+### Study
+- Define: select a single word to see an offline dictionary entry (WordNet), including common word forms such as "went" → "go".
+- All notes: a new Library tab to search every highlight and note across your documents, filter by colour, type or tag, edit notes and jump to the passage.
+- Tags on highlights and notes.
+- Export flashcards for Anki, from one document or from the All notes view.
+- Save an annotated copy of a PDF with your highlights, underlines, strike-outs and notes written in as standard PDF annotations, so they show in Acrobat, Edge and other readers. The original file is not changed.
+
+See docs/RELEASE-0.6.md for details and limits.
 
 ## [0.5.0] — reading and study tools
 
