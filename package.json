@@ -17,6 +17,7 @@
     "cap:android": "npx cap open android",
     "cap:ios": "npx cap open ios",
     "lint": "eslint src scripts tests",
+    "pretest": "npm run prepare:dictionary",
     "test": "vitest run",
     "prepare:ocr": "node scripts/prepare-ocr.mjs",
     "prebuild": "npm run prepare:assets",
