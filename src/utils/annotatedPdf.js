@@ -60,11 +60,26 @@ export async function annotatePdf(bytes, annotations) {
   return { bytes: await doc.save(), written, skipped };
 }
 
-/** Save "<name> (annotated).pdf". Returns { written: null } if the user cancels the save dialog. */
-export async function saveAnnotatedPdf(tab, annotations) {
+/** Has anything been typed into this PDF's form fields since it was opened? */
+export const formChanged = doc => (doc?.annotationStorage?.size || 0) > 0;
+
+/** The document's bytes, with any form values typed in this session written into them. */
+async function currentBytes(tab, doc) {
+  if (formChanged(doc)) return doc.saveDocument();
   const original = await loadPdfData(tab.path);
   if (!original) throw new Error('This document is no longer cached. Import the original file again.');
-  const { bytes, written, skipped } = await annotatePdf(original, annotations);
+  return original;
+}
+
+/** Save "<name> (filled).pdf" with the form values typed in this session. */
+export async function saveFilledPdf(tab, doc) {
+  if (!formChanged(doc)) throw new Error('Nothing has been filled in yet.');
+  return saveBinaryFile(`${tab.name.replace(/\.pdf$/i, '')} (filled).pdf`, await doc.saveDocument(), 'application/pdf');
+}
+
+/** Save "<name> (annotated).pdf" (including filled form values). Returns { written: null } if the user cancels. */
+export async function saveAnnotatedPdf(tab, annotations, doc) {
+  const { bytes, written, skipped } = await annotatePdf(await currentBytes(tab, doc), annotations);
   if (!written) throw new Error('None of these notes have saved positions yet. Highlight the passages again, then save the copy.');
   const saved = await saveBinaryFile(`${tab.name.replace(/\.pdf$/i, '')} (annotated).pdf`, bytes, 'application/pdf');
   return saved ? { written, skipped } : { written: null, skipped };

@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
-export const isTauri = () => typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+// The real Tauri bridge has an invoke function; an element with that id (DOM clobbering) doesn't.
+export const isTauri = () => typeof window !== 'undefined' && typeof window.__TAURI_INTERNALS__?.invoke === 'function';
 export const isCapacitor = () => Capacitor.isNativePlatform();
 export const isMobile = isCapacitor;
 export const isDesktop = isTauri;
@@ -14,6 +15,19 @@ export function openFilePicker() {
       catch(error){reject(error);}
     };
     input.oncancel=()=>{input.remove();resolve(null);}; input.click();
+  });
+}
+/** Pick any file of the given types (e.g. '.zip' or '.json'). Resolves to {name, data} or null. */
+export function pickFile(accept) {
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input'); input.type = 'file'; input.accept = accept;
+    input.style.display = 'none'; document.body.appendChild(input);
+    input.onchange = async () => {
+      const file = input.files?.[0]; input.remove();
+      if (!file) return resolve(null);
+      try { resolve({ name: file.name, data: await file.arrayBuffer() }); } catch (error) { reject(error); }
+    };
+    input.oncancel = () => { input.remove(); resolve(null); }; input.click();
   });
 }
 export const copyToClipboard = async text => { await navigator.clipboard.writeText(text); };

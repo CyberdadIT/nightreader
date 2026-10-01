@@ -10,15 +10,18 @@ import StatusBar from './components/StatusBar.jsx';
 import Library from './components/Library.jsx';
 import ReadingTools from './components/ReadingTools.jsx';
 import { useStore } from './store/useStore.js';
-import { documentId, savePdfData, loadPdfData, deletePdfData, deleteOcrPages } from './utils/storage.js';
+import { documentId, savePdfData, loadPdfData, deletePdfData, deleteOcrPages, saveSnapshot } from './utils/storage.js';
 import { loadDocument } from './utils/documents.js';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts.js';
 import { watchOpenedFiles } from './utils/desktop.js';
+import { watchMobileOpenedFiles } from './utils/mobile.js';
 import PasswordDialog from './components/PasswordDialog.jsx';
 import ShortcutsHelp from './components/ShortcutsHelp.jsx';
+import PrintDialog from './components/PrintDialog.jsx';
 import AppSettings from './components/AppSettings.jsx';
 import UpdateBanner from './components/UpdateBanner.jsx';
 import WarmLight from './components/WarmLight.jsx';
+import Toast from './components/Toast.jsx';
 import { useReadingPace } from './hooks/useReadingPace.js';
 import { useFolderSync } from './hooks/useFolderSync.js';
 import styles from './App.module.css';
@@ -67,6 +70,8 @@ export default function App() {
         const outline=opened.kind==='epub'?opened.outline:await opened.getOutline().catch(()=>[]);
         if(cancelled)return;
         updateTab(tab.id,{totalPages:opened.numPages,outline:outline||[],page:Math.min(Math.max(1,tab.page||1),opened.numPages)});
+        // Remembered so its notes stay out of sync and its OCR text out of storage.
+        if(opened.passwordProtected)useStore.getState().updateDocument(tab.path,{protected:true});
       }catch(e){if(!cancelled)setError(e.message||'Could not open document.');}
       finally{if(!cancelled)setLoading(false);}
     })();
@@ -85,7 +90,7 @@ export default function App() {
     }catch(e){setError(`Import failed: ${e.message}`);}
   },[openTab,upsert]);
   const openLibraryFile=entry=>{openTab({path:entry.id,name:entry.name,kind:entry.kind});setLibraryOpen(false);};
-  async function removeFile(entry){try{await deletePdfData(entry.id);await deleteOcrPages(entry.id);useStore.getState().removeDocument(entry.id);}catch(e){setError(`Could not remove document: ${e.message}`);}}
+  async function removeFile(entry){try{const s=useStore.getState(),notes=s.annotations.filter(a=>a.filePath===entry.id);if(notes.length)await saveSnapshot(`Before removing ${entry.name}`,{annotations:notes,bookmarks:s.bookmarks.filter(b=>b.filePath===entry.id)});await deletePdfData(entry.id);await deleteOcrPages(entry.id);useStore.getState().removeDocument(entry.id);}catch(e){setError(`Could not remove document: ${e.message}`);}}
   useEffect(()=>{
     const drop=async e=>{e.preventDefault();for(const file of Array.from(e.dataTransfer?.files||[])){try{await importFile({name:file.name,data:await file.arrayBuffer()});}catch(err){setError(err.message);}}};
     const drag=e=>e.preventDefault();window.addEventListener('drop',drop);window.addEventListener('dragover',drag);
@@ -96,18 +101,20 @@ export default function App() {
   useEffect(()=>{
     if(restoring)return;
     let stop=()=>{},cancelled=false;
+    let stopMobile=()=>{};
     watchOpenedFiles(importFile,e=>setError(e.message)).then(fn=>{if(cancelled)fn();else stop=fn;}).catch(e=>setError(e.message));
-    return()=>{cancelled=true;stop();};
+    watchMobileOpenedFiles(importFile,e=>setError(e.message)).then(fn=>{if(cancelled)fn();else stopMobile=fn;}).catch(e=>setError(e.message));
+    return()=>{cancelled=true;stop();stopMobile();};
   },[restoring,importFile]);
   useReadingPace(tab,doc);
   useFolderSync(!restoring);
   const jumpTo=(docId,page)=>{useStore.getState().openAt(docId,page);setLibraryOpen(false);};
-  useKeyboardShortcuts({onHelp:()=>setDialog(d=>d==='shortcuts'?null:'shortcuts'),onNextPage:()=>tab&&setPage(tab.page+(useStore.getState().spread&&tab.kind!=='epub'?2:1)),onPrevPage:()=>tab&&setPage(tab.page-(useStore.getState().spread&&tab.kind!=='epub'?2:1))});
+  useKeyboardShortcuts({rtl:Boolean(doc?.rtl),onPrint:()=>doc&&setDialog('print'),onHelp:()=>setDialog(d=>d==='shortcuts'?null:'shortcuts'),onNextPage:()=>tab&&setPage(tab.page+(useStore.getState().spread&&tab.kind!=='epub'?2:1)),onPrevPage:()=>tab&&setPage(tab.page-(useStore.getState().spread&&tab.kind!=='epub'?2:1))});
   return <div className={`${styles.app} ${focus?styles.focusMode:''}`}>
     <TopBar onToggleSidebar={()=>setSidebarOpen(s=>!s)} onToggleSettings={()=>setSettingsOpen(s=>!s)} settingsOpen={settingsOpen} onFileLoaded={importFile} onLibrary={()=>setLibraryOpen(s=>!s)} onAppSettings={()=>setDialog('settings')} onShortcuts={()=>setDialog('shortcuts')}/>
     <UpdateBanner/>
     <TabBar onFileLoaded={importFile}/>
-    {!libraryOpen&&tab&&<Toolbar onFileLoaded={importFile}/>}
+    {!libraryOpen&&tab&&<Toolbar onFileLoaded={importFile} onPrint={()=>doc&&setDialog('print')}/>}
     {!libraryOpen&&doc&&<SearchBar pdf={doc}/>}
     {!libraryOpen&&doc&&!focus&&<ReadingTools key={tab?.path} doc={doc}/>}
     <div className={styles.body}>
@@ -117,11 +124,13 @@ export default function App() {
         {(restoring||loading)&&<div className={styles.loadingOverlay} role="status"><div className={styles.spinner}/><p>{restoring?'Restoring library…':'Opening document…'}</p></div>}
         {(libraryOpen||!tab)&&!restoring?<Library onImport={importFile} onOpen={openLibraryFile} onRemove={removeFile} onJump={jumpTo}/>:doc&&<Viewer pdf={doc}/>}
       </main>
-      {!libraryOpen&&settingsOpen&&<SettingsPanel onClose={()=>setSettingsOpen(false)}/>}
+      {!libraryOpen&&settingsOpen&&<SettingsPanel doc={doc} onClose={()=>setSettingsOpen(false)}/>}
     </div><StatusBar doc={doc}/>
     {passwordPrompt&&<PasswordDialog {...passwordPrompt}/>}
     {dialog==='shortcuts'&&<ShortcutsHelp onClose={()=>setDialog(null)}/>}
+    {dialog==='print'&&doc&&<PrintDialog doc={doc} onClose={()=>setDialog(null)}/>}
     {dialog==='settings'&&<AppSettings onClose={()=>setDialog(null)} onShortcuts={()=>setDialog('shortcuts')}/>}
+    <Toast/>
     <WarmLight/>
   </div>;
 }

@@ -27,7 +27,7 @@ export default function Library({onImport,onOpen,onRemove,onJump}) {
       <p>{d.needsFile?'Original file needs to be imported again':`${d.kind==='epub'?'Chapter':'Page'} ${d.lastPage||1} · ${d.size?`${(d.size/1024/1024).toFixed(1)} MB`:'Stored locally'}`}</p>
       <label>Collection<select value={d.collection||''} onChange={e=>update(d.id,{collection:e.target.value})}><option value="">Unsorted</option>{collections.map(c=><option key={c}>{c}</option>)}</select></label>
       <div className={styles.actions}><button onClick={()=>d.needsFile?importDocument():onOpen(d)}>{d.needsFile?'Locate file':'Continue reading'}</button><button onClick={()=>setRemoving(d.id)}>Remove</button></div>
-      {removing===d.id&&<div role="alert"><p>Remove this document and its local notes and OCR? The original file stays unchanged.</p><button onClick={async()=>{await onRemove(d);setRemoving(null);}}>Remove from device</button><button onClick={()=>setRemoving(null)}>Cancel</button></div>}
+      {removing===d.id&&<div role="alert"><p>Remove this document and its local notes and OCR? The original file stays unchanged, and a copy of its notes is kept under Settings → Backup.</p><button onClick={async()=>{await onRemove(d);setRemoving(null);}}>Remove from device</button><button onClick={()=>setRemoving(null)}>Cancel</button></div>}
     </article>)}</div>
     </>}
     <p className={styles.footnote}>Local storage can be cleared by the operating system or app data reset. Keep your original documents and export important notes.</p>

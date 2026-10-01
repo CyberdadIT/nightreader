@@ -16,7 +16,8 @@ export async function loadDocument(bytes, kind, id, { askPassword } = {}) {
     const { loadEpub } = await import('./epub.js');
     return loadEpub(bytes);
   }
-  const task = pdfjs.getDocument({data:new Uint8Array(bytes).slice()});
+  // No eval: closes the class of bug behind CVE-2024-4367. No embedded PDF JavaScript either.
+  const task = pdfjs.getDocument({data:new Uint8Array(bytes).slice(), isEvalSupported:false, enableScripting:false});
   let used = null, triedSaved = false, cancelled = false;
   task.onPassword = (update, reason) => {
     const saved = sessionPasswords.get(id);
@@ -37,9 +38,12 @@ export async function loadDocument(bytes, kind, id, { askPassword } = {}) {
   pdf.kind = 'pdf';
   pdf.documentId = id;
   pdf.passwordProtected = !!used;
+  pdf.ocrMemory = new Map();
+  // OCR results: memory first (protected PDFs never store them), then local storage.
+  pdf.loadOcr = async n => pdf.ocrMemory.get(n) || (pdf.passwordProtected ? null : await loadOcrPage(id, n));
   const cache = new Map();
   pdf.getPageText = async n => {
-    const ocr = await loadOcrPage(id, n);
+    const ocr = await pdf.loadOcr(n);
     if (ocr?.text?.trim()) return ocr.text;
     if (!cache.has(n)) {
       const page = await pdf.getPage(n), content = await page.getTextContent();
@@ -48,7 +52,7 @@ export async function loadDocument(bytes, kind, id, { askPassword } = {}) {
     return cache.get(n);
   };
   pdf.getSearchText = async n => {
-    const ocr = await loadOcrPage(id,n);
+    const ocr = await pdf.loadOcr(n);
     if (ocr?.words?.length) return ocr.words.map(w=>w.text+' ').join('');
     return (await (await pdf.getPage(n)).getTextContent()).items.map(i=>i.str||'').join('');
   };

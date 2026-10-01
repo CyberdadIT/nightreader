@@ -1,11 +1,12 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { notesMarkdown, notesHtml } from "../utils/export.js";
 import { saveTextFile } from "../utils/platform.js";
 import { useStore } from "../store/useStore.js";
 import styles from "./SettingsPanel.module.css";
 import { TagInput } from "./NotesLibrary.jsx";
+import { deleteNoteWithUndo } from "./Toast.jsx";
 import { ankiFlashcards } from "../utils/notes.js";
-import { saveAnnotatedPdf } from "../utils/annotatedPdf.js";
+import { saveAnnotatedPdf, saveFilledPdf } from "../utils/annotatedPdf.js";
 
 const MODES = [
   { id: "dark",          label: "Dark",           bg: "#1a1f2a", fg: "#e6edf3" },
@@ -26,12 +27,14 @@ const HL_COLORS = [
   { id: "green",  bg: "rgba(165,214,167,0.65)" },
 ];
 
-export default function SettingsPanel({ onClose }) {
+export default function SettingsPanel({ doc, onClose }) {
   const [exportError, setExportError] = useState("");
   const updateNote = useStore(s => s.updateAnnotationNote);
   const goToPage = useStore(s => s.setCurrentPage);
   const font = useStore(s => s.font);
   const setFont = useStore(s => s.setFont);
+  const publisherStyles = useStore(s => s.publisherStyles);
+  const setPublisherStyles = useStore(s => s.setPublisherStyles);
   const readingMode  = useStore((s) => s.readingMode);
   const fontSize     = useStore((s) => s.fontSize);
   const lineHeight   = useStore((s) => s.lineHeight);
@@ -57,6 +60,12 @@ export default function SettingsPanel({ onClose }) {
   const removeAnnotation = useStore((s) => s.removeAnnotation);
   const updateAnnotation = useStore((s) => s.updateAnnotation);
   const [exportMessage, setExportMessage] = useState("");
+  const [hasForm, setHasForm] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    if (doc?.kind === "pdf") doc.getFieldObjects().then(f => { if (!cancelled) setHasForm(!!f && Object.keys(f).length > 0); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [doc]);
 
   const fileAnnotations = annotations.filter((a) => a.filePath === filePath);
 
@@ -69,8 +78,12 @@ export default function SettingsPanel({ onClose }) {
         setExportMessage("Flashcards saved. In Anki, choose File → Import and pick the file.");
         return;
       }
+      if (format === "filled") {
+        if (await saveFilledPdf(activeTab, doc)) setExportMessage("Saved a copy with your form entries. Typed values last until you close the document, so save before closing.");
+        return;
+      }
       if (format === "pdf") {
-        const { written, skipped } = await saveAnnotatedPdf(activeTab, fileAnnotations);
+        const { written, skipped } = await saveAnnotatedPdf(activeTab, fileAnnotations, doc);
         if (written !== null) setExportMessage(`Saved a copy with ${written} annotation${written === 1 ? "" : "s"}${skipped ? `. ${skipped} older note${skipped === 1 ? "" : "s"} without saved positions ${skipped === 1 ? "was" : "were"} left out; re-highlight ${skipped === 1 ? "it" : "them"} to include ${skipped === 1 ? "it" : "them"}` : ""}.`);
         return;
       }
@@ -94,6 +107,7 @@ export default function SettingsPanel({ onClose }) {
             {MODES.map((m) => (
               <button
                 key={m.id}
+                aria-pressed={readingMode === m.id}
                 className={`${styles.pill} ${readingMode === m.id ? styles.pillActive : ""}`}
                 style={readingMode === m.id ? { background: m.bg, color: m.fg, borderColor: m.fg } : {}}
                 onClick={() => setReadingMode(m.id)}
@@ -131,7 +145,11 @@ export default function SettingsPanel({ onClose }) {
           <SliderRow label="Brightness" min={5}   max={100} value={brightness}               display={`${brightness}%`}           onChange={setBrightness} />
           {activeTab?.kind === "epub" && <><label>Font<select aria-label="EPUB font" value={font} onChange={e => setFont(e.target.value)}><option value="serif">Serif</option><option value="sans">Sans</option><option value="mono">Monospace</option></select></label>
           <SliderRow label="Font size"  min={12}  max={24}  value={fontSize}                 display={`${fontSize}px`}            onChange={setFontSize} />
-          <SliderRow label="Line height" min={14} max={30}  value={Math.round(lineHeight*10)} display={(lineHeight).toFixed(1)}    onChange={(v) => setLineHeight(v/10)} /></>}
+          <SliderRow label="Line height" min={14} max={30}  value={Math.round(lineHeight*10)} display={(lineHeight).toFixed(1)}    onChange={(v) => setLineHeight(v/10)} />
+          <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--muted)", marginTop: 8 }}>
+            <input type="checkbox" checked={publisherStyles || !!doc?.fixedLayout} disabled={!!doc?.fixedLayout} onChange={e => setPublisherStyles(e.target.checked)} />
+            {doc?.fixedLayout ? "Book's own layout (always on for fixed-layout books)" : "Use the book's own styles"}
+          </label></>}
           <SliderRow label="Margins"    min={16}  max={80}  value={margin}                   display={`${margin}px`}              onChange={setMargin} />
         </section>
 
@@ -168,7 +186,7 @@ export default function SettingsPanel({ onClose }) {
         {/* Annotations */}
         <section className={styles.annotSection}>
           <h3 className={styles.sectionTitle}>Annotations ({fileAnnotations.length})</h3>
-          <div className="exportActions"><button disabled={!fileAnnotations.length} onClick={() => exportNotes("md")}>Export Markdown</button><button disabled={!fileAnnotations.length} onClick={() => exportNotes("html")}>Export printable HTML</button><button disabled={!fileAnnotations.length} onClick={() => exportNotes("anki")}>Export flashcards (Anki)</button>{activeTab?.kind !== "epub" && <button disabled={!fileAnnotations.length} onClick={() => exportNotes("pdf")}>Save annotated PDF copy</button>}</div>
+          <div className="exportActions"><button disabled={!fileAnnotations.length} onClick={() => exportNotes("md")}>Export Markdown</button><button disabled={!fileAnnotations.length} onClick={() => exportNotes("html")}>Export printable HTML</button><button disabled={!fileAnnotations.length} onClick={() => exportNotes("anki")}>Export flashcards (Anki)</button>{activeTab?.kind !== "epub" && <button disabled={!fileAnnotations.length} onClick={() => exportNotes("pdf")}>Save annotated PDF copy</button>}{hasForm && <button onClick={() => exportNotes("filled")}>Save filled form copy</button>}</div>
           {exportError && <p role="alert">{exportError}</p>}
           {exportMessage && <p role="status" style={{ fontSize: 12, color: "var(--muted)" }}>{exportMessage}</p>}
           {fileAnnotations.length === 0 ? (
@@ -187,7 +205,7 @@ export default function SettingsPanel({ onClose }) {
                   <span>{activeTab?.kind === "epub" ? "Chapter" : "Page"} {a.page}</span>
                   <button
                     className={styles.annotDelete}
-                    onClick={() => removeAnnotation(a.id)}
+                    onClick={() => deleteNoteWithUndo(a.id)}
                     aria-label="Delete annotation"
                   >×</button>
                 </div>

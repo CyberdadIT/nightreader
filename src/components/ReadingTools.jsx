@@ -2,6 +2,7 @@ import React,{useEffect,useRef,useState} from 'react';
 import {useStore} from '../store/useStore.js';
 import {speechVoices,stopSpeech,speakChunk,splitSpeech} from '../utils/speech.js';
 import {createOcrWorker,recognizePage} from '../utils/ocr.js';
+import {ocrLanguage,installedOcrLanguages} from '../utils/ocrLanguages.js';
 import styles from './ReadingTools.module.css';
 export default function ReadingTools({doc}) {
   const tab=useStore(s=>s.getActiveTab()),rate=useStore(s=>s.speechRate),voice=useStore(s=>s.speechVoice),continuous=useStore(s=>s.speechContinuous);
@@ -64,12 +65,13 @@ export default function ReadingTools({doc}) {
   async function pause(){speech.current.token++;speech.current.continuing=false;setState('paused');await stopSpeech().catch(()=>{});}
   async function stop(){speech.current.token++;speech.current.continuing=false;setState('idle');speech.current.chunks=[];await stopSpeech().catch(()=>{});}
   async function scan(){
-    setOcrBusy(true);cancelOcr.current=false;setMessage('Preparing local English OCR…');
+    const language=useStore.getState().ocrLanguage||'eng',languageName=ocrLanguage(language)?.name||'English';
+    setOcrBusy(true);cancelOcr.current=false;setMessage(`Preparing local ${languageName} OCR…`);
     let done=0,skipped=0;
     const aborted=new Promise((_,reject)=>{abortOcr.current=()=>reject(new Error('OCR cancelled'));});
     aborted.catch(()=>{});
     try {
-      const w=await createOcrWorker(info=>{if(alive.current&&!cancelOcr.current)setMessage(`${info.status} ${Math.round((info.progress||0)*100)}%`);});worker.current=w;if(!alive.current||cancelOcr.current){await w.terminate();return;}
+      const w=await createOcrWorker(info=>{if(alive.current&&!cancelOcr.current)setMessage(`${info.status} ${Math.round((info.progress||0)*100)}%`);},language);worker.current=w;if(!alive.current||cancelOcr.current){await w.terminate();return;}
       const first=all?1:speakingPage,last=all?doc.numPages:speakingPage;
       for(let page=first;page<=last&&!cancelOcr.current;page++){
         if(alive.current)setMessage(`OCR page ${page} of ${last}…`);
@@ -87,10 +89,21 @@ export default function ReadingTools({doc}) {
       <label title={`Carry on to the next ${unit} automatically`}><input type="checkbox" checked={continuous} onChange={e=>useStore.getState().setSpeechContinuous(e.target.checked)}/> Continuous</label>
       <label>Sleep<select aria-label="Sleep timer" value={sleep} onChange={e=>chooseSleep(e.target.value)}><option value="off">Off</option>{[15,30,45,60,90].map(m=><option key={m} value={m}>{m} min</option>)}<option value="end">End of {unit}</option></select></label>
       <label>Speed<select aria-label="Speech speed" value={rate} disabled={state==='playing'} onChange={e=>useStore.getState().setSpeechRate(Number(e.target.value))}>{[.5,.75,1,1.25,1.5,1.75,2].map(r=><option key={r} value={r}>{r}×</option>)}</select></label>
-      {doc.kind==='pdf'&&<><label><input type="checkbox" checked={all} disabled={ocrBusy} onChange={e=>setAll(e.target.checked)}/> All pages</label><button disabled={ocrBusy} onClick={scan}>OCR {all?'document':'this page'}</button>{ocrBusy&&<button onClick={()=>{cancelOcr.current=true;setMessage('OCR cancelled. Completed pages are saved.');abortOcr.current?.();worker.current?.terminate();}}>Cancel OCR</button>}</>}
+      {doc.kind==='pdf'&&<><label><input type="checkbox" checked={all} disabled={ocrBusy} onChange={e=>setAll(e.target.checked)}/> All pages</label><OcrLanguagePicker disabled={ocrBusy}/><button disabled={ocrBusy} onClick={scan}>OCR {all?'document':'this page'}</button>{ocrBusy&&<button onClick={()=>{cancelOcr.current=true;setMessage('OCR cancelled. Completed pages are saved.');abortOcr.current?.();worker.current?.terminate();}}>Cancel OCR</button>}</>}
     </div>
     {state==='paused'&&<p>Resume repeats the current sentence.</p>}
     {sleepUntil>0&&<p>Sleep timer: read aloud stops at {new Date(sleepUntil).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}.</p>}
     {message&&<p role="status">{message}</p>}
   </section>;
+}
+
+/** OCR language: English plus any packs downloaded in NightReader settings. */
+function OcrLanguagePicker({disabled}){
+  const language=useStore(s=>s.ocrLanguage)||'eng';
+  const [installed,setInstalled]=React.useState(['eng']);
+  React.useEffect(()=>{let live=true;installedOcrLanguages().then(list=>{if(live)setInstalled(list);});return()=>{live=false;};},[]);
+  const options=installed.includes(language)?installed:[...installed,language];
+  return <label title="More languages can be downloaded in NightReader settings">OCR language<select aria-label="OCR language" value={language} disabled={disabled} onChange={e=>useStore.getState().setOcrLanguage(e.target.value)}>
+    {options.map(code=><option key={code} value={code}>{ocrLanguage(code)?.name||code}{installed.includes(code)?'':' (not downloaded)'}</option>)}
+  </select></label>;
 }

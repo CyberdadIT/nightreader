@@ -25,6 +25,7 @@ const GROUPS = [
   ]],
   ['Tools', [
     [<><K>Ctrl</K><K>F</K></>, 'Find in document'],
+    [<><K>Ctrl</K><K>P</K></>, 'Print'],
     [<K>Esc</K>, 'Close search or a dialog'],
     [<K>?</K>, 'Show this list'],
   ]],

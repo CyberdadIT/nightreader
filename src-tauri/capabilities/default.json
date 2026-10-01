@@ -1,1 +1,22 @@
-{"identifier": "default", "description": "Reader window: user-chosen note exports, annotated PDF copies, sync folder choice and opening release pages", "windows": ["main"], "permissions": ["core:default", "dialog:allow-save", "dialog:allow-open", "fs:allow-write-text-file", "fs:allow-write-file", "opener:default"]}
+{
+  "identifier": "default",
+  "description": "Reader window: user-chosen saves, sync folder choice, and opening the project release page. Other web links go through a native confirmation (security::open_external_link).",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "dialog:allow-save",
+    "dialog:allow-open",
+    "fs:allow-write-text-file",
+    "fs:allow-write-file",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://github.com/CyberdadIT/nightreader/*"
+        }
+      ]
+    }
+  ]
+}

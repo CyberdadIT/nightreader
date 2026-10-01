@@ -24,8 +24,17 @@ export async function checkForUpdate(currentVersion, fetchImpl = globalThis.fetc
   if (!res.ok) throw new Error(`GitHub returned ${res.status}. Try again later.`);
   const release = await res.json();
   const version = String(release.tag_name || '').replace(/^v/i, '');
-  const info = { version, url: release.html_url || RELEASES_PAGE, name: release.name || `NightReader ${version}` };
+  const info = { version, url: safeReleaseUrl(release.html_url), name: String(release.name || `NightReader ${version}`).slice(0, 120) };
   return { status: compareVersions(version, currentVersion) > 0 ? 'available' : 'current', ...info };
+}
+
+/** The download link must be one of this project's release pages; anything else falls back to the list. */
+export function safeReleaseUrl(url) {
+  try {
+    const u = new URL(String(url));
+    if (u.protocol === 'https:' && u.hostname === 'github.com' && u.pathname.startsWith(`/${RELEASES_REPO}/releases/`) && !u.username && !u.password) return u.href;
+  } catch { /* fall through */ }
+  return RELEASES_PAGE;
 }
 
 /** Automatic checks run at most once a day. */

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useStore } from "../store/useStore.js";
 import styles from "./Sidebar.module.css";
+import { goToBookLocation } from "./EpubChapter.jsx";
 
 const TABS = ["Pages", "Contents", "Bookmarks"];
 
@@ -19,7 +20,7 @@ export default function Sidebar({ pdf, outline, onClose }) {
   const setCurrentPage = useStore((s) => s.setCurrentPage);
   const removeBookmark = useStore((s) => s.removeBookmark);
 
-  const fileBookmarks = bookmarks.filter((b) => b.filePath === filePath);
+  const fileBookmarks = bookmarks.filter((b) => b.filePath === filePath && !b.deleted);
 
   // ── Clear thumbnails and outline when tab/PDF changes ─────────────────
   useEffect(() => {
@@ -138,18 +139,19 @@ export default function Sidebar({ pdf, outline, onClose }) {
               const n     = i + 1;
               const thumb = thumbnails[n];
               return (
-                <div
+                <button
+                  type="button"
                   key={n}
                   className={`${styles.thumb} ${currentPage === n ? styles.thumbActive : ""}`}
                   onClick={() => setCurrentPage(n)}
-                  role="button"
-                  aria-label={`Go to page ${n}`}
+                  aria-label={pdf?.kind === "epub" ? `Go to chapter ${n}` : `Go to page ${n}`}
+                  aria-current={currentPage === n ? "page" : undefined}
                 >
                   <div className={styles.thumbPreview}>
                     {thumb ? (
                       <img
                         src={thumb}
-                        alt={`Page ${n}`}
+                        alt=""
                         style={{ width: "100%", height: "100%", objectFit: "contain", display: "block" }}
                       />
                     ) : (
@@ -163,7 +165,7 @@ export default function Sidebar({ pdf, outline, onClose }) {
                     )}
                   </div>
                   <span className={styles.thumbLabel}>{pdf?.kind === "epub" ? `Chapter ${n}` : n}</span>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -171,16 +173,19 @@ export default function Sidebar({ pdf, outline, onClose }) {
 
         {/* ── Table of Contents ────────────────────────────────────────── */}
         {tab === 1 && (
-          <div className={styles.toc}>
+          <nav className={styles.toc} aria-label="Table of contents">
             {resolvedOutline.length > 0 ? (
-              resolvedOutline.map((item, i) => (
-                <TocItem
-                  key={i}
-                  item={item}
-                  currentPage={currentPage}
-                  onNavigate={setCurrentPage}
-                />
-              ))
+              <ul className={styles.tocList}>
+                {resolvedOutline.map((item, i) => (
+                  <TocItem
+                    key={i}
+                    item={item}
+                    currentPage={currentPage}
+                    onNavigate={(page, anchor) => (pdf?.kind === "epub" ? goToBookLocation(page, anchor) : setCurrentPage(page))}
+                    unit={pdf?.kind === "epub" ? "chapter" : "page"}
+                  />
+                ))}
+              </ul>
             ) : (
               <p className={styles.empty}>
                 {outline?.length > 0
@@ -188,7 +193,7 @@ export default function Sidebar({ pdf, outline, onClose }) {
                   : "No table of contents in this document."}
               </p>
             )}
-          </div>
+          </nav>
         )}
 
         {/* ── Bookmarks ────────────────────────────────────────────────── */}
@@ -197,14 +202,14 @@ export default function Sidebar({ pdf, outline, onClose }) {
             {fileBookmarks.length > 0 ? (
               fileBookmarks.map((bm) => (
                 <div key={bm.id} className={styles.bookmark}>
-                  <div
+                  <button
+                    type="button"
                     className={styles.bookmarkMain}
                     onClick={() => setCurrentPage(bm.page)}
-                    role="button"
                   >
                     <span className={styles.bookmarkTitle}>{bm.title}</span>
-                    <span className={styles.bookmarkPage}>Page {bm.page}</span>
-                  </div>
+                    <span className={styles.bookmarkPage}>{pdf?.kind === "epub" ? "Chapter" : "Page"} {bm.page}</span>
+                  </button>
                   <button
                     className={styles.bookmarkDelete}
                     onClick={() => removeBookmark(bm.id)}
@@ -225,24 +230,35 @@ export default function Sidebar({ pdf, outline, onClose }) {
   );
 }
 
-function TocItem({ item, currentPage, onNavigate, depth = 0 }) {
+function TocItem({ item, currentPage, onNavigate, unit, depth = 0 }) {
   const isActive = item.page === currentPage;
   const hasPage  = item.page !== null && item.page !== undefined;
   return (
-    <>
-      <div
-        className={`${styles.tocItem} ${isActive ? styles.tocActive : ""} ${!hasPage ? styles.tocNoLink : ""}`}
-        style={{ paddingLeft: `${8 + depth * 12}px` }}
-        onClick={() => hasPage && onNavigate(item.page)}
-        role={hasPage ? "button" : undefined}
-        title={hasPage ? `Go to page ${item.page}` : item.title}
-      >
-        <span className={styles.tocTitle}>{item.title}</span>
-        {hasPage && <span className={styles.tocPage}>{item.page}</span>}
-      </div>
-      {item.items?.map((child, i) => (
-        <TocItem key={i} item={child} currentPage={currentPage} onNavigate={onNavigate} depth={depth + 1} />
-      ))}
-    </>
+    <li>
+      {hasPage ? (
+        <button
+          type="button"
+          className={`${styles.tocItem} ${isActive ? styles.tocActive : ""}`}
+          style={{ paddingLeft: `${8 + depth * 12}px` }}
+          onClick={() => onNavigate(item.page, item.anchor)}
+          aria-current={isActive ? "location" : undefined}
+          title={item.title}
+        >
+          <span className={styles.tocTitle}>{item.title}</span>
+          <span className={styles.tocPage} aria-label={`${unit} ${item.page}`}>{item.page}</span>
+        </button>
+      ) : (
+        <span className={`${styles.tocItem} ${styles.tocNoLink}`} style={{ paddingLeft: `${8 + depth * 12}px` }}>
+          <span className={styles.tocTitle}>{item.title}</span>
+        </span>
+      )}
+      {item.items?.length > 0 && (
+        <ul className={styles.tocList}>
+          {item.items.map((child, i) => (
+            <TocItem key={i} item={child} currentPage={currentPage} onNavigate={onNavigate} unit={unit} depth={depth + 1} />
+          ))}
+        </ul>
+      )}
+    </li>
   );
 }

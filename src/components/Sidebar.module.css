@@ -188,3 +188,16 @@
   cursor: default;
   opacity: 0.5;
 }
+
+/* Navigation targets are real buttons (keyboard and screen readers) styled as list rows.
+   :where() keeps these resets at zero specificity so active/hover states still apply. */
+.tocList { list-style: none; }
+:where(button.tocItem, button.thumb, button.bookmarkMain) {
+  width: 100%;
+  font-family: inherit;
+  text-align: left;
+  background: transparent;
+  border-top: 0; border-right: 0; border-bottom: 0;
+}
+:where(button.bookmarkMain) { color: inherit; border: 0; }
+:where(button.thumb) { color: inherit; padding: 0; display: block; }

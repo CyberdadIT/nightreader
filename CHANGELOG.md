@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.7.0] — security hardening, safer notes, and the gaps from the 0.6 review
+
+### Security (findings from the 0.6 security review)
+- Strict Content Security Policy in the Windows app and the web/phone builds; scripts can only come from the app itself.
+- The app window can't be navigated to another site, and links inside documents open in your browser only after you confirm.
+- Sync files are treated as untrusted: future timestamps are clamped, removing five or more notes asks first, and a snapshot is kept before anything is removed.
+- Android: backups and device transfer exclude NightReader's data; unneeded permissions removed; sharing limited to the app's cache.
+- Text from password-protected PDFs (OCR results, notes) stays on the device and out of the sync file.
+- EPUB content can't shadow app internals (DOM clobbering), PDF.js runs without eval, Markdown exports escape HTML, the update link must point at this project, and PowerShell is launched by full path.
+- Build pipeline: GitHub Actions pinned to commit SHAs, Dependabot, no caches or stored credentials in release builds, a dependency audit job (npm and Rust), and one release workflow instead of two. npm audit and cargo audit report no vulnerabilities.
+- Setup script checks SHA-256 and Microsoft signatures before running downloaded installers.
+
+### New
+- PDF links work: contents links jump inside the document, web links ask before opening.
+- Fill in PDF forms and save a filled copy.
+- Print (Ctrl+P) through the system print dialog; phones print from the share sheet.
+- EPUB: the book's own table of contents with nested sections, right-to-left books, fixed-layout books, and an option to use the book's own styles (sanitised and contained).
+- Backup and restore everything in one file, optionally with the documents. Earlier versions of your notes can be restored from snapshots.
+- Undo after deleting a note.
+- Phones can sync through the same sync file as Windows. Bookmarks now sync on all devices.
+- Android and iOS: open PDFs and EPUBs from Files, email and other apps.
+- OCR in 22 more languages, downloaded once and checked against fixed checksums.
+- A crash screen with a way back to the library, and a local error log you can copy into a bug report.
+- Settings show storage use and whether the system may clear it.
+
+### Accessibility
+- Automated WCAG 2.1 AA checks (axe-core) on the main screens. Fixed: document tabs, the reading area and sidebar items now work with a keyboard and screen readers.
+
+See docs/RELEASE-0.7.md for details and limits.
+
 ## [0.6.0] — easier on Windows, kinder at night, better for study
 
 ### Windows

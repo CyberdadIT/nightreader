@@ -1,4 +1,5 @@
 mod desktop;
+mod security;
 mod speech;
 
 pub fn run() {
@@ -12,6 +13,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(security::navigation_guard())
         .manage(speech::SpeechState::default())
         .manage(desktop::OpenedFiles::from_startup())
         .invoke_handler(tauri::generate_handler![
@@ -21,7 +23,8 @@ pub fn run() {
             desktop::take_opened_files,
             desktop::read_opened_file,
             desktop::sync_read,
-            desktop::sync_write
+            desktop::sync_write,
+            security::open_external_link
         ])
         .run(tauri::generate_context!())
         .expect("error while running NightReader");

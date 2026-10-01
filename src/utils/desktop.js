@@ -1,4 +1,4 @@
-import { isTauri } from './platform.js';
+import { isTauri, isCapacitor } from './platform.js';
 
 const baseName = path => path.split(/[\\/]/).pop() || 'document';
 
@@ -45,4 +45,25 @@ export async function chooseFolder(title) {
   const { open } = await import('@tauri-apps/plugin-dialog');
   const folder = await open({ directory: true, multiple: false, title });
   return typeof folder === 'string' ? folder : null;
+}
+
+/**
+ * Open a web link found inside a document, only after the user confirms.
+ * Windows: a native dialog from the Rust side (page script can't click it).
+ * Elsewhere: a confirmation that shows the real site name, then the system browser.
+ */
+export async function openDocumentLink(url) {
+  if (isTauri()) {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return invoke('open_external_link', { url });
+  }
+  let u;
+  try { u = new URL(url); } catch { return false; }
+  if (!['http:', 'https:', 'mailto:'].includes(u.protocol)) return false;
+  const label = u.protocol === 'mailto:' ? `email ${u.pathname}` : `${u.hostname}\n\n${u.href}`;
+  if (!window.confirm(`Open this link in your browser?\n\nSite: ${label}`)) return false;
+  // Capacitor hands any navigation away from the app to the system browser.
+  if (isCapacitor()) window.location.href = u.href;
+  else window.open(u.href, '_blank', 'noopener,noreferrer');
+  return true;
 }

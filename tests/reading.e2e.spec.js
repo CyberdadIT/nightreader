@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from './fixtures.js';
 import {readFile} from 'node:fs/promises';
 async function importFile(page,file){const chooser=page.waitForEvent('filechooser');await page.getByRole('button',{name:'Import PDF or EPUB'}).click();await(await chooser).setFiles(`tests/fixtures/${file}`);}
 async function selectText(page,quote){await page.evaluate(q=>{const root=document.querySelector('[data-text-root]');const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;while((node=walker.nextNode())){const start=node.textContent.indexOf(q);if(start>=0){const range=document.createRange();range.setStart(node,start);range.setEnd(node,start+q.length);const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);document.dispatchEvent(new Event('selectionchange'));break;}}},quote);await expect(page.getByRole('toolbar',{name:'Selected text actions'})).toBeVisible();}

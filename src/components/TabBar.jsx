@@ -15,8 +15,10 @@ export default function TabBar({ onFileLoaded }) {
 
   if (tabs.length === 0) return null;
 
+  // Open documents are a list of buttons (not ARIA tabs: there is no tab panel per
+  // document, and a tab can't contain its own close button).
   return (
-    <div style={{
+    <nav aria-label="Open documents" style={{
       display: "flex",
       alignItems: "center",
       background: "var(--bg)",
@@ -26,25 +28,20 @@ export default function TabBar({ onFileLoaded }) {
       height: "46px",
       paddingLeft: "4px",
     }}>
+      <ul style={{ display: "flex", listStyle: "none", height: "100%", margin: 0, padding: 0 }}>
       {tabs.map((tab) => {
         const isActive = tab.id === activeTabId;
         return (
-          <div
+          <li
             key={tab.id}
-            role="tab"
-            aria-selected={isActive}
-            tabIndex={0}
-            onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setActiveTab(tab.id); } }}
-            onClick={() => setActiveTab(tab.id)}
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "6px",
-              padding: "0 10px 0 12px",
+              gap: "2px",
+              padding: "0 4px 0 0",
               height: "100%",
-              cursor: "pointer",
               flexShrink: 0,
-              maxWidth: "200px",
+              maxWidth: "220px",
               minWidth: "100px",
               background: isActive ? "var(--surface)" : "transparent",
               borderRight: "1px solid var(--border)",
@@ -53,37 +50,32 @@ export default function TabBar({ onFileLoaded }) {
               position: "relative",
             }}
           >
-            {/* PDF icon */}
-            <span style={{ fontSize: "11px", flexShrink: 0, opacity: 0.6 }}>📄</span>
-
-            {/* File name */}
-            <span style={{
-              fontSize: "11px",
-              color: isActive ? "var(--text)" : "var(--muted)",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              flex: 1,
-              fontFamily: "var(--font-sans)",
-            }}
+            <button
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              aria-current={isActive ? "page" : undefined}
               title={tab.name}
+              style={{ display: "flex", alignItems: "center", gap: "6px", flex: 1, minWidth: 0, height: "100%", padding: "0 6px 0 12px",
+                background: "transparent", border: 0, color: "inherit", cursor: "pointer", font: "inherit", textAlign: "left" }}
             >
-              {tab.name.replace(/\.pdf$/i, "")}
-            </span>
-
-            {/* Page indicator */}
-            {tab.totalPages > 0 && (
+              <span aria-hidden="true" style={{ fontSize: "11px", flexShrink: 0, opacity: 0.6 }}>{tab.kind === "epub" ? "📖" : "📄"}</span>
               <span style={{
-                fontSize: "9px",
-                color: "var(--muted)",
-                fontFamily: "var(--font-mono)",
-                flexShrink: 0,
-                opacity: 0.7,
+                fontSize: "11px",
+                color: isActive ? "var(--text)" : "var(--muted)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                flex: 1,
+                fontFamily: "var(--font-sans)",
               }}>
-                {tab.page}/{tab.totalPages}
+                {tab.name.replace(/\.(pdf|epub)$/i, "")}
               </span>
-            )}
-
+              {tab.totalPages > 0 && (
+                <span style={{ fontSize: "10px", color: "var(--muted)", fontFamily: "var(--font-mono)", flexShrink: 0 }}>
+                  <span className="sr-only">{tab.kind === "epub" ? "chapter" : "page"} </span>{tab.page}/{tab.totalPages}
+                </span>
+              )}
+            </button>
             {/* Close button */}
             <button
               onClick={(e) => { e.stopPropagation(); closeTab(tab.id); }}
@@ -116,9 +108,10 @@ export default function TabBar({ onFileLoaded }) {
             >
               ×
             </button>
-          </div>
+          </li>
         );
       })}
+      </ul>
 
       {/* New tab button */}
       <button
@@ -142,6 +135,6 @@ export default function TabBar({ onFileLoaded }) {
       >
         +
       </button>
-    </div>
+    </nav>
   );
 }

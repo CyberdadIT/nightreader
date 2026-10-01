@@ -95,7 +95,7 @@ export default function Viewer({pdf}) {
       // Re-render at most every 80 ms, and only for a noticeable change.
       if(Math.abs(ratio/pinch.applied-1)<0.04||now-pinch.at<80)return;
       pinch.applied=ratio;pinch.at=now;
-      if(pdf.kind==='epub'){s.setFontSize(Math.max(12,Math.min(24,Math.round(pinch.fontSize*ratio))));return;}
+      if(pdf.kind==='epub'&&!pdf.fixedLayout){s.setFontSize(Math.max(12,Math.min(24,Math.round(pinch.fontSize*ratio))));return;}
       const before=Number(el.querySelector('[data-scale]')?.dataset.scale)||pinch.scale,focus=middle(e.touches);
       s.setZoom(pinchZoom(pinch.scale,ratio));
       // Keep the point between the fingers in place as the page grows or shrinks.
@@ -115,7 +115,9 @@ export default function Viewer({pdf}) {
       const dir=touchPageTurn({dx:t.clientX-g.x,dy:t.clientY-g.y,ms:Date.now()-g.at,start:g.start,end:position(),
         clientWidth:el.clientWidth,scrollWidth:el.scrollWidth,clientHeight:el.clientHeight,scrollHeight:el.scrollHeight});
       // Sideways swipes flip like a book and land at the top; pulling past the end of a page keeps reading flow.
-      if(dir)turnRef.current(dir,Math.abs(t.clientX-g.x)>Math.abs(t.clientY-g.y)?'top':undefined);
+      // Right-to-left books (Arabic, Hebrew, manga) turn the other way round.
+      const sideways=Math.abs(t.clientX-g.x)>Math.abs(t.clientY-g.y);
+      if(dir)turnRef.current(sideways&&pdf.rtl?-dir:dir,sideways?'top':undefined);
     }
     const cancel=()=>{gesture=null;pinch=null;};
     el.addEventListener('touchstart',onStart,{passive:true});
@@ -177,8 +179,8 @@ export default function Viewer({pdf}) {
       {['yellow','blue','pink','green'].map(c=><button key={c} aria-label={`Highlight ${c}`} onClick={()=>annotate(`hl-${c}`)} style={{background:{yellow:'#ffdf00',blue:'#4fc3f7',pink:'#f48fb1',green:'#a5d6a7'}[c],color:'#111'}}>●</button>)}
       <button onClick={()=>annotate('underline')}>Underline</button><button onClick={()=>annotate('strikethrough')}>Strike</button><button onClick={()=>annotate('note')}>Note</button><button aria-label="Close selection actions" onClick={()=>{setPopup(null);window.getSelection()?.removeAllRanges();}}>×</button>
     </div>}
-    <div ref={container} data-viewer-scroll onScroll={onScroll} className={styles.readingArea} style={{background:mode==='light'?'#ddd':mode==='sepia'?'#bfae8c':'#0d1117',flexDirection:spread&&pdf.kind==='pdf'?'row':'column',alignItems:spread?'flex-start':'center'}}>
-      {pdf.kind==='epub'?<EpubChapter book={pdf} page={page}/>:pages.map(n=><PdfPage key={`${tab.path}:${n}`} pdf={pdf} pageNumber={n} availableWidth={spread?(size.width-16)/2:size.width} availableHeight={size.height} scrollRoot={container}/>)}
+    <div ref={container} data-viewer-scroll tabIndex={0} role="region" aria-label={pdf.kind==='epub'?'Book text':'Document pages'} onScroll={onScroll} className={styles.readingArea} style={{background:mode==='light'?'#ddd':mode==='sepia'?'#bfae8c':'#0d1117',flexDirection:spread&&pdf.kind==='pdf'?'row':'column',alignItems:spread?'flex-start':'center'}}>
+      {pdf.kind==='epub'?<EpubChapter book={pdf} page={page} available={size}/>:pages.map(n=><PdfPage key={`${tab.path}:${n}`} pdf={pdf} pageNumber={n} availableWidth={spread?(size.width-16)/2:size.width} availableHeight={size.height} scrollRoot={container}/>)}
     </div>
   </div>;
 }

@@ -1,11 +1,12 @@
 import React,{useEffect,useRef,useState} from 'react';
-import {TextLayer} from 'pdfjs-dist';
+import {TextLayer,AnnotationLayer} from 'pdfjs-dist';
+import {createLinkService} from '../utils/pdfLinks.js';
 import {useStore} from '../store/useStore.js';
 import {loadOcrPage} from '../utils/storage.js';
 import {fitScale} from '../utils/annotations.js';
 import TextDecorations from './TextDecorations.jsx';
 export default function PdfPage({pdf,pageNumber,availableWidth,availableHeight,scrollRoot}) {
-  const boxRef=useRef(null),canvasRef=useRef(null),textRef=useRef(null);
+  const boxRef=useRef(null),canvasRef=useRef(null),textRef=useRef(null),annotRef=useRef(null);
   const [near,setNear]=useState(false),[page,setPage]=useState(null),[ready,setReady]=useState(false),[ocr,setOcr]=useState(null),[error,setError]=useState('');
   const fit=useStore(s=>s.fitMode),zoom=useStore(s=>s.zoom),rotation=useStore(s=>s.rotation),mode=useStore(s=>s.readingMode),invert=useStore(s=>s.invertColors),version=useStore(s=>s.ocrVersion);
   const base=page?.getViewport({scale:1,rotation:((page.rotate||0)+rotation)%360});
@@ -24,13 +25,13 @@ export default function PdfPage({pdf,pageNumber,availableWidth,availableHeight,s
   },[pdf,pageNumber,near]);
   useEffect(()=>{
     if(!near)return;let cancelled=false;
-    loadOcrPage(pdf.documentId,pageNumber).then(data=>{if(!cancelled)setOcr(data||null);}).catch(()=>{});
+    (pdf.loadOcr?pdf.loadOcr(pageNumber):loadOcrPage(pdf.documentId,pageNumber)).then(data=>{if(!cancelled)setOcr(data||null);}).catch(()=>{});
     return()=>{cancelled=true;};
   },[pdf,pageNumber,near,version]);
   useEffect(()=>{
-    const canvas=canvasRef.current,root=textRef.current;
+    const canvas=canvasRef.current,root=textRef.current,annot=annotRef.current;
     setReady(false);if(!canvas||!root)return;
-    root.innerHTML='';
+    root.innerHTML='';if(annot)annot.innerHTML='';
     if(!near||!page){canvas.width=0;canvas.height=0;return;}
     let cancelled=false,task=null,layer=null;
     const vp=page.getViewport({scale,rotation:((page.rotate||0)+rotation)%360});
@@ -53,15 +54,27 @@ export default function PdfPage({pdf,pageNumber,availableWidth,availableHeight,s
         }else{
           layer=new TextLayer({textContentSource:content,container:root,viewport:vp});await layer.render();
         }
+        // Links and form fields. Values typed into forms live in the document's
+        // annotation storage until it's closed; "Save filled copy" writes them out.
+        if(annot&&!cancelled){
+          const annotations=await page.getAnnotations({intent:'display'});if(cancelled)return;
+          if(annotations.length){
+            pdf.linkService??=createLinkService(pdf);
+            const avp=vp.clone({dontFlip:true});
+            const al=new AnnotationLayer({div:annot,accessibilityManager:null,annotationCanvasMap:null,annotationEditorUIManager:null,page,viewport:avp,structTreeLayer:null});
+            await al.render({viewport:avp,div:annot,annotations,page,linkService:pdf.linkService,annotationStorage:pdf.annotationStorage,renderForms:true,enableScripting:false,hasJSActions:false,fieldObjects:null,imageResourcesPath:''});
+          }
+        }
         if(!cancelled)setReady(true);
       }catch(e){if(!cancelled&&e.name!=='RenderingCancelledException')setError(e.message);}
     })();
-    return()=>{cancelled=true;task?.cancel();layer?.cancel();canvas.width=0;canvas.height=0;root.innerHTML='';};
+    return()=>{cancelled=true;task?.cancel();layer?.cancel();canvas.width=0;canvas.height=0;root.innerHTML='';if(annot)annot.innerHTML='';};
   },[page,near,scale,rotation,ocr]);
   const filters={dark:'brightness(.8)',light:'none',sepia:'sepia(.5)',amoled:'brightness(.45)',green:'sepia(1) hue-rotate(65deg)',night:'brightness(.8) saturate(.9)',nightContrast:'contrast(1.45)',twilight:'sepia(.2) hue-rotate(240deg)',console:'sepia(.8) brightness(.75)'};
-  return <div ref={boxRef} data-page={pageNumber} data-scale={scale} style={{width,height,position:'relative',flexShrink:0,background:'#fff',boxShadow:'0 3px 20px #0008',overflow:'hidden'}}>
+  return <div ref={boxRef} data-page={pageNumber} data-scale={scale} style={{'--scale-factor':scale,width,height,position:'relative',flexShrink:0,background:'#fff',boxShadow:'0 3px 20px #0008',overflow:'hidden'}}>
     <canvas ref={canvasRef} style={{width,height,display:'block',filter:invert?'invert(1) hue-rotate(180deg)':filters[mode]||'none'}}/>
     <div ref={textRef} className="textLayer" data-text-root data-page-number={pageNumber} style={{width,height}} aria-label={`Page ${pageNumber} text`}/>
+    <div ref={annotRef} className="annotationLayer" style={{position:'absolute',inset:0,zIndex:3}}/>
     <TextDecorations rootRef={textRef} ready={ready} page={pageNumber} viewport={viewport} layoutKey={`${scale}:${rotation}`}/>
     {error&&<p role="alert" style={{position:'absolute',top:20,left:20,color:'#900'}}>{error}</p>}
   </div>;

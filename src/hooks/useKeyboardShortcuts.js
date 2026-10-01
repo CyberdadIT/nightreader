@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useStore } from "../store/useStore.js";
 import { stepZoom } from "../utils/navigation.js";
 
-export function useKeyboardShortcuts({ onNextPage, onPrevPage, onHelp }) {
+export function useKeyboardShortcuts({ onNextPage, onPrevPage, onHelp, onPrint, rtl = false }) {
   const toggleSearch    = useStore((s) => s.toggleSearch);
   const toggleFocusMode = useStore((s) => s.toggleFocusMode);
   const setZoom         = useStore((s) => s.setZoom);
@@ -17,11 +17,16 @@ export function useKeyboardShortcuts({ onNextPage, onPrevPage, onHelp }) {
       // Dialogs handle their own keys.
       if (document.querySelector('[aria-modal="true"]')) return;
       if (e.key === "?") { e.preventDefault(); onHelp?.(); return; }
+      // Ctrl+P prints the document, not the reader's interface.
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") { e.preventDefault(); onPrint?.(); return; }
 
       // Find the scrollable viewer container
       const viewerEl = document.querySelector("[data-viewer-scroll]");
 
-      switch (e.key) {
+      // In a right-to-left book the left arrow moves forward, as pages turn that way.
+      const key = rtl && e.key === "ArrowRight" ? "ArrowLeft" : rtl && e.key === "ArrowLeft" ? "ArrowRight" : e.key;
+
+      switch (key) {
 
         // ── Arrow Up / Down: scroll within page, only change page at edges ──
         case "ArrowDown": {
@@ -134,5 +139,5 @@ export function useKeyboardShortcuts({ onNextPage, onPrevPage, onHelp }) {
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onNextPage, onPrevPage, onHelp, toggleSearch, toggleFocusMode, setZoom, zoom, searchVisible, scrollMode]);
+  }, [onNextPage, onPrevPage, onHelp, onPrint, rtl, toggleSearch, toggleFocusMode, setZoom, zoom, searchVisible, scrollMode]);
 }

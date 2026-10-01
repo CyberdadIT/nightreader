@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 import { readFile } from 'node:fs/promises';
 
 async function importFile(page, file) {
@@ -140,9 +140,9 @@ test('shortcut list opens with ? and closes with Escape; settings explain deskto
   await expect(help).toBeHidden();
   await page.getByRole('button', { name: 'App settings' }).click();
   const settings = page.getByRole('dialog', { name: 'NightReader settings' });
-  await expect(settings).toContainText('Folder sync is available in the Windows app');
+  await expect(settings.getByRole('button', { name: 'Open sync file…' })).toBeVisible();
   await expect(settings).toContainText('WordNet');
-  await settings.getByRole('button', { name: 'Keyboard and mouse shortcuts' }).click();
+  await settings.getByRole('button', { name: 'Keyboard, mouse and touch shortcuts' }).click();
   await expect(help).toBeVisible();
 });
 

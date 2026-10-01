@@ -23,8 +23,15 @@
 - Annotated PDF copies with highlights and notes written in as standard PDF annotations.
 - Continuous read aloud with a sleep timer; warm light with an evening schedule; time-left estimates.
 - Windows: "Open with" integration, single window, folder sync (e.g. OneDrive) and new-version notices.
+- Clickable PDF links (contents jumps in place; web links ask before opening) and fillable PDF forms with a saved filled copy.
+- Printing through the system print dialog (phones: share sheet → Print).
+- EPUB: the book's own contents (nested sections), right-to-left and fixed-layout books, and optional publisher styles, sanitised.
+- One-file backup and restore, automatic note snapshots, undo after deleting a note, and a crash screen with a local error log.
+- Sync on phones through the same sync file (open it from OneDrive/Drive/iCloud, save the merged copy back); bookmarks sync too.
+- Android and iOS: open PDFs and EPUBs from other apps ("Open with" / "Open in").
+- OCR in 22 more languages, downloaded on request and checked against pinned SHA-256 hashes.
 
-Read [release details](docs/RELEASE-0.6.md) and the [0.5 platform validation notes](docs/RELEASE-0.5.md) for supported formats, OCR/speech behaviour, local-storage limits and native build instructions. Windows, Android and iOS are the priority targets; Linux releases are deferred.
+Read the [0.7 release notes](docs/RELEASE-0.7.md), [0.6 release details](docs/RELEASE-0.6.md) and the [0.5 platform validation notes](docs/RELEASE-0.5.md) for supported formats, OCR/speech behaviour, local-storage limits and native build instructions. Windows, Android and iOS are the priority targets; Linux releases are deferred.
 
 ---
 
@@ -37,13 +44,6 @@ Read [release details](docs/RELEASE-0.6.md) and the [0.5 platform validation not
 | iOS | Capacitor | Unsigned simulator app; device distribution requires Apple signing |
 
 Native device acceptance remains required before a production release.
-
-----------|----------------|-----------------------------------|
-| Windows  | Tauri + React  | `.msi` / `.exe` via GitHub Releases |
-| Linux    | Tauri + React  | `.deb` / `.AppImage` / Flathub    |
-| macOS    | Tauri + React  | `.dmg` via GitHub Releases        |
-| Android  | Capacitor      | `.apk` via GitHub Releases / F-Droid |
-| iOS      | Capacitor      | `.ipa` sideload / AltStore        |
 
 ---
 
@@ -186,6 +186,7 @@ nightreader/
 | `+ / −` | Zoom in / out |
 | `Ctrl + 0` | Reset zoom |
 | `Ctrl + F` | Find in document |
+| `Ctrl + P` | Print |
 | `R` | Toggle focus mode |
 | `Esc` | Close search or a dialog |
 | `?` | Show all shortcuts in the app |

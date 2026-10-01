@@ -10,7 +10,9 @@ pub struct Voice { name: String, lang: String, #[serde(rename="voiceURI")] uri: 
 #[cfg(target_os="windows")]
 fn powershell(script: &str) -> std::process::Command {
     use std::os::windows::process::CommandExt;
-    let mut command=std::process::Command::new("powershell.exe");
+    // Full path to the in-box Windows PowerShell, so no other powershell.exe on the search path is used.
+    let root=std::env::var_os("SystemRoot").map(std::path::PathBuf::from).unwrap_or_else(||std::path::PathBuf::from(r"C:\Windows"));
+    let mut command=std::process::Command::new(root.join(r"System32\WindowsPowerShell\v1.0\powershell.exe"));
     command.creation_flags(0x08000000).args(["-NoProfile","-NonInteractive","-Command",script]);
     command
 }

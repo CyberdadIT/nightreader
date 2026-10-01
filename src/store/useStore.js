@@ -71,12 +71,24 @@ export const useStore = create(persist((set, get) => ({
   setFitMode: fitMode => set({ fitMode }), rotate: () => set(s => ({ rotation: (s.rotation + 90) % 360 })),
   toggleScrollMode: () => set(s => ({ scrollMode: !s.scrollMode, spread: false })),
   toggleSpread: () => set(s => ({ spread: !s.spread, scrollMode: false })),
-  bookmarks: [], addBookmark: bm => set(s => ({ bookmarks: s.bookmarks.some(b => b.page === bm.page && b.filePath === bm.filePath) ? s.bookmarks : [...s.bookmarks, { ...bm, id: uid() }] })),
-  removeBookmark: id => set(s => ({ bookmarks: s.bookmarks.filter(b => b.id !== id) })),
+  // Removed bookmarks stay as { deleted: true } records so folder sync can remove them elsewhere too.
+  bookmarks: [], addBookmark: bm => set(s => {
+    const existing = s.bookmarks.find(b => b.page === bm.page && b.filePath === bm.filePath);
+    if (existing && !existing.deleted) return {};
+    const rest = s.bookmarks.filter(b => b !== existing);
+    return { bookmarks: [...rest, { ...bm, id: existing?.id || uid(), updatedAt: Date.now(), deleted: false }] };
+  }),
+  removeBookmark: id => set(s => ({ bookmarks: s.bookmarks.map(b => b.id === id ? { ...b, deleted: true, updatedAt: Date.now() } : b) })),
   annotations: [], deletedAnnotations: [],
   addAnnotation: ann => set(s => ({ annotations: [...s.annotations, { tags: [], ...ann, id: uid(), createdAt: Date.now(), updatedAt: Date.now() }] })),
   // Deletions are remembered briefly so folder sync can remove them on other devices too.
   removeAnnotation: id => set(s => ({ annotations: s.annotations.filter(a => a.id !== id), deletedAnnotations: [...s.deletedAnnotations, { id, at: Date.now() }].slice(-1000) })),
+  // Undo a deletion: the same note (same id) comes back and its deletion record is dropped.
+  // Brings a note back (Undo) or re-dates one that still exists ("Keep mine" on sync), so it wins over older deletions.
+  restoreAnnotation: ann => set(s => ({ annotations: s.annotations.some(a => a.id === ann.id)
+      ? s.annotations.map(a => a.id === ann.id ? { ...a, updatedAt: Date.now() } : a)
+      : [...s.annotations, { ...ann, updatedAt: Date.now() }],
+    deletedAnnotations: s.deletedAnnotations.filter(d => d.id !== ann.id) })),
   updateAnnotation: (id, patch) => set(s => ({ annotations: s.annotations.map(a => a.id === id ? { ...a, ...patch, updatedAt: Date.now() } : a) })),
   updateAnnotationNote: (id, note) => get().updateAnnotation(id, { note }),
   addRecentFile: file => set(s => ({ recentFiles: [file, ...s.recentFiles.filter(f => f.path !== file.path)].slice(0, 20) })),
@@ -87,6 +99,9 @@ export const useStore = create(persist((set, get) => ({
   ocrVersion: 0, bumpOcrVersion: () => set(s => ({ ocrVersion: s.ocrVersion + 1 })),
   speechRate: 1, speechVoice: '', setSpeechRate: speechRate => set({ speechRate }), setSpeechVoice: speechVoice => set({ speechVoice }),
   speechContinuous: true, setSpeechContinuous: speechContinuous => set({ speechContinuous }),
+  // EPUB publisher styles (sanitised); off by default. Fixed-layout books always use them.
+  publisherStyles: false, setPublisherStyles: publisherStyles => set({ publisherStyles }),
+  ocrLanguage: 'eng', setOcrLanguage: ocrLanguage => set({ ocrLanguage }),
   // Reading pace per document: seconds per PDF page, words per minute for EPUB.
   readingPace: {}, recordPace: (docId, patch) => set(s => ({ readingPace: { ...s.readingPace, [docId]: { ...s.readingPace[docId], ...patch } } })),
   syncFolder: '', lastSyncAt: 0, setSyncFolder: syncFolder => set({ syncFolder, lastSyncAt: 0 }), setLastSyncAt: lastSyncAt => set({ lastSyncAt }),
@@ -94,5 +109,5 @@ export const useStore = create(persist((set, get) => ({
   setAutoUpdateCheck: autoUpdateCheck => set({ autoUpdateCheck }), setUpdateCheck: patch => set(patch),
 }), { name: 'nightreader-settings', version: 2,
   migrate: state => ({ ...state, library: state.library || [], collections: state.collections || [] }),
-  partialize: s => Object.fromEntries(['tabs','activeTabId','library','collections','recentFiles','readingMode','font','fontSize','lineHeight','margin','brightness','bookmarks','annotations','zoom','scrollMode','fitMode','rotation','spread','speechRate','speechVoice','warmth','warmSchedule','deletedAnnotations','speechContinuous','readingPace','syncFolder','lastSyncAt','autoUpdateCheck','lastUpdateCheck','dismissedUpdate'].map(k => [k, s[k]])),
+  partialize: s => Object.fromEntries(['tabs','activeTabId','library','collections','recentFiles','readingMode','font','fontSize','lineHeight','margin','brightness','bookmarks','annotations','zoom','scrollMode','fitMode','rotation','spread','speechRate','speechVoice','warmth','warmSchedule','deletedAnnotations','speechContinuous','readingPace','syncFolder','lastSyncAt','autoUpdateCheck','lastUpdateCheck','dismissedUpdate','publisherStyles','ocrLanguage'].map(k => [k, s[k]])),
 }));

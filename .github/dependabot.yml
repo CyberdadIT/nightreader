@@ -1,0 +1,23 @@
+# Keeps pinned GitHub Actions and dependencies current. Actions are pinned to
+# commit SHAs (a tag can be moved; a SHA can't), and Dependabot updates the
+# SHA and its version comment together.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+    groups:
+      actions: { patterns: ["*"] }
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      tauri: { patterns: ["@tauri-apps/*"] }
+      capacitor: { patterns: ["@capacitor/*", "@capacitor-community/*"] }
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule: { interval: weekly }
+    open-pull-requests-limit: 5
+    groups:
+      tauri: { patterns: ["tauri", "tauri-*"] }

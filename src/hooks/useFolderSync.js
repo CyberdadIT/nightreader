@@ -2,45 +2,59 @@ import { useEffect } from 'react';
 import { create } from 'zustand';
 import { useStore } from '../store/useStore.js';
 import { isTauri } from '../utils/platform.js';
-import { mergeSync, parseSyncFile, syncFileText } from '../utils/sync.js';
-
-/** Live sync status for the settings dialog (not saved). */
-export const useSyncStatus = create(set => ({ state: 'idle', message: '', set: (state, message = '') => set({ state, message }) }));
-
-let runNow = null;
-/** Ask the running sync to go now (used by "Sync now"). */
-export const syncNow = () => runNow?.();
-
-const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+import { runSync, keepNotes, syncState } from '../utils/syncEngine.js';
 
 /**
- * Keeps notes, highlights and reading positions in step with the sync folder:
+ * Live sync status for the settings dialog (not saved).
+ * state: idle | syncing | ok | error | confirm. In 'confirm', `removed` holds the notes
+ * the sync would delete, waiting for the user to approve or keep them.
+ */
+export const useSyncStatus = create(set => ({
+  state: 'idle', message: '', removed: [],
+  set: (state, message = '', removed = []) => set({ state, message, removed }),
+}));
+
+let runNow = null;
+/** Ask the running folder sync to go now (used by "Sync now" and the confirm buttons). */
+export const syncNow = options => runNow?.(options);
+/** Answer a sync that wanted to remove several notes. */
+export async function answerRemovals(approve) {
+  const { removed } = useSyncStatus.getState();
+  if (!approve) keepNotes(removed);
+  useSyncStatus.getState().set('syncing');
+  await syncNow({ approveRemovals: approve });
+}
+
+/**
+ * Keeps notes, bookmarks and reading positions in step with the sync folder:
  * on start, a few seconds after changes, every minute, and when the window regains focus.
  */
 export function useFolderSync(ready) {
   const folder = useStore(s => s.syncFolder);
   useEffect(() => {
     if (!ready || !folder || !isTauri()) { useSyncStatus.getState().set('idle'); return; }
-    let stopped = false, busy = false, again = false, applying = false, timer;
+    let stopped = false, busy = false, again = false, timer;
     const status = useSyncStatus.getState().set;
-    async function run() {
+    async function run({ approveRemovals = false } = {}) {
       if (stopped) return;
       if (busy) { again = true; return; }
+      // A pending "remove notes?" question pauses automatic sync until it's answered.
+      if (useSyncStatus.getState().state === 'confirm' && !approveRemovals) return;
       busy = true; status('syncing');
       try {
         const { invoke } = await import('@tauri-apps/api/core');
-        const text = await invoke('sync_read', { folder });
-        const remote = text ? parseSyncFile(text) : null;
-        const s = useStore.getState();
-        const merged = mergeSync({ library: s.library, annotations: s.annotations, deletedAnnotations: s.deletedAnnotations, collections: s.collections }, remote);
+        const result = await runSync({
+          readRemote: () => invoke('sync_read', { folder }),
+          writeRemote: contents => invoke('sync_write', { folder, contents }),
+          approveRemovals,
+        });
         if (stopped) return;
-        const patch = {};
-        for (const key of ['library', 'annotations', 'deletedAnnotations', 'collections']) if (!same(merged[key], s[key])) patch[key] = merged[key];
-        if (Object.keys(patch).length) { applying = true; useStore.setState(patch); applying = false; }
-        const out = syncFileText(merged.file);
-        if (out !== text) await invoke('sync_write', { folder, contents: out });
-        useStore.getState().setLastSyncAt(Date.now());
-        status('ok');
+        if (result.status === 'confirm') {
+          status('confirm', `The sync folder would remove ${result.removed.length} notes from this device.`, result.removed);
+        } else {
+          useStore.getState().setLastSyncAt(Date.now());
+          status('ok');
+        }
       } catch (e) {
         status('error', String(e?.message || e));
       } finally {
@@ -51,8 +65,9 @@ export function useFolderSync(ready) {
     runNow = run;
     run();
     const unsubscribe = useStore.subscribe((s, prev) => {
-      if (applying) return;
-      if (s.annotations !== prev.annotations || s.library !== prev.library || s.deletedAnnotations !== prev.deletedAnnotations || s.collections !== prev.collections) {
+      if (syncState.applying) return;
+      if (s.annotations !== prev.annotations || s.library !== prev.library || s.deletedAnnotations !== prev.deletedAnnotations
+        || s.collections !== prev.collections || s.bookmarks !== prev.bookmarks) {
         clearTimeout(timer); timer = setTimeout(run, 5000);
       }
     });

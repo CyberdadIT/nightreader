@@ -4,6 +4,7 @@ import { NOTE_TYPES, allTags, ankiFlashcards, filterNotes, parseTags } from '../
 import { notesMarkdown } from '../utils/export.js';
 import { saveTextFile } from '../utils/platform.js';
 import styles from './Library.module.css';
+import { deleteNoteWithUndo } from './Toast.jsx';
 
 const SWATCH = { 'hl-yellow': '#ffdf00', 'hl-blue': '#4fc3f7', 'hl-pink': '#f48fb1', 'hl-green': '#a5d6a7', underline: '#f48fb1', strikethrough: '#ef9a9a', note: '#4fc3f7' };
 
@@ -56,7 +57,10 @@ export default function NotesLibrary({ onJump }) {
                   <span style={{ display: 'block', color: 'var(--muted)', fontSize: 12, marginTop: 4 }}>{n.document.kind === 'epub' ? 'Chapter' : 'Page'} {n.page} · open ›</span>
                 </button>
                 <textarea className={styles.field} aria-label={`Note on ${n.document.name} ${n.document.kind === 'epub' ? 'chapter' : 'page'} ${n.page}`} rows={2} placeholder="Add a note…" value={n.note || ''} onChange={e => updateAnnotation(n.id, { note: e.target.value })} />
-                <TagInput tags={n.tags || []} onChange={next => updateAnnotation(n.id, { tags: next })} label={`Tags for note on page ${n.page}`} />
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}><TagInput tags={n.tags || []} onChange={next => updateAnnotation(n.id, { tags: next })} label={`Tags for note on page ${n.page}`} /></div>
+                  <button onClick={() => deleteNoteWithUndo(n.id)} aria-label={`Delete note on page ${n.page}`}>Delete</button>
+                </div>
               </article>
             </React.Fragment>
           );
