@@ -1,7 +1,7 @@
 import React,{useRef,useState,useEffect,useLayoutEffect} from 'react';
 import {useStore} from '../store/useStore.js';
 import {selectionAnchor} from '../utils/annotations.js';
-import {stepZoom,wheelPageTurn,wheelPixels} from '../utils/navigation.js';
+import {stepZoom,wheelPageTurn,wheelPixels,touchPageTurn,pinchZoom} from '../utils/navigation.js';
 import PdfPage from './PdfPage.jsx';
 import EpubChapter from './EpubChapter.jsx';
 import DefinitionCard from './DefinitionCard.jsx';
@@ -22,11 +22,22 @@ export default function Viewer({pdf}) {
   useLayoutEffect(()=>{
     if(scroll&&pdf.kind!=='epub')return;
     const el=container.current,edge=enterEdge.current;enterEdge.current=null;
+    el.scrollLeft=0; // when zoomed in, every new page starts at its left edge
     if(edge!=='bottom'){el.scrollTop=0;return;}
     const toBottom=()=>{el.scrollTop=el.scrollHeight;};
     toBottom();const frame=requestAnimationFrame(toBottom),late=setTimeout(toBottom,120);
     return()=>{cancelAnimationFrame(frame);clearTimeout(late);};
   },[page,tab?.path,scroll,pdf.kind]);
+  // Turn one page (two in two-page view) forward or back. Returns false at either end of the document.
+  // edge: where to land on the new page ('top' or 'bottom').
+  function turnPage(dir,edge=dir>0?'top':'bottom'){
+    const s=useStore.getState(),current=s.getActiveTab();if(!current)return false;
+    const step=s.spread&&pdf.kind!=='epub'?2:1,total=current.totalPages||1;
+    if(dir>0?current.page+step>total:current.page<=1)return false;
+    enterEdge.current=edge;
+    s.setCurrentPage(current.page+dir*step);return true;
+  }
+  const turnRef=useRef(turnPage);turnRef.current=turnPage;
   // Mouse wheel and trackpad. Ctrl+wheel zooms (PDF) or resizes text (EPUB).
   // Outside continuous-scroll mode, scrolling past the top or bottom edge turns the page.
   useEffect(()=>{
@@ -54,12 +65,77 @@ export default function Viewer({pdf}) {
       // One mouse-wheel notch (~100px) turns the page; a trackpad needs a deliberate push past the edge.
       wheel.acc+=Math.abs(dy);if(wheel.acc<60)return;
       wheel.acc=0;wheel.lockUntil=now+350;
-      enterEdge.current=dir>0?'top':'bottom';
-      s.setCurrentPage(current.page+dir*step);
+      turnRef.current(dir);
     }
     el.addEventListener('wheel',onWheel,{passive:false});
     return()=>el.removeEventListener('wheel',onWheel);
   },[pdf]);
+  // Touch screens (Surface, tablets, phones): swipe left/right to turn the page, or
+  // swipe up/down past the end of a page. Listeners are passive, so normal touch
+  // scrolling and pinch-zoom are untouched; the decision is made when the finger lifts.
+  useEffect(()=>{
+    const el=container.current;let gesture=null,pinch=null;
+    const position=()=>({top:el.scrollTop,left:el.scrollLeft});
+    const spread=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+    const middle=t=>{const r=el.getBoundingClientRect();return{x:(t[0].clientX+t[1].clientX)/2-r.left,y:(t[0].clientY+t[1].clientY)/2-r.top};};
+    function onStart(e){
+      if(e.touches.length===2){
+        // Two fingers: pinch to zoom the page (not the whole app).
+        gesture=null;
+        const s=useStore.getState(),scale=Number(el.querySelector('[data-scale]')?.dataset.scale)||1.8*s.zoom;
+        pinch={distance:spread(e.touches),scale,fontSize:s.fontSize,applied:1,at:0};return;
+      }
+      if(e.touches.length!==1){gesture=null;return;}
+      const t=e.touches[0];gesture={x:t.clientX,y:t.clientY,at:Date.now(),start:position()};
+    }
+    function onMove(e){
+      if(gesture&&e.touches.length>1)gesture=null;
+      if(!pinch||e.touches.length!==2)return;
+      const ratio=spread(e.touches)/pinch.distance,now=Date.now(),s=useStore.getState();
+      // Re-render at most every 80 ms, and only for a noticeable change.
+      if(Math.abs(ratio/pinch.applied-1)<0.04||now-pinch.at<80)return;
+      pinch.applied=ratio;pinch.at=now;
+      if(pdf.kind==='epub'){s.setFontSize(Math.max(12,Math.min(24,Math.round(pinch.fontSize*ratio))));return;}
+      const before=Number(el.querySelector('[data-scale]')?.dataset.scale)||pinch.scale,focus=middle(e.touches);
+      s.setZoom(pinchZoom(pinch.scale,ratio));
+      // Keep the point between the fingers in place as the page grows or shrinks.
+      requestAnimationFrame(()=>{
+        const after=Number(el.querySelector('[data-scale]')?.dataset.scale)||before,k=after/before;
+        el.scrollLeft=(el.scrollLeft+focus.x)*k-focus.x;el.scrollTop=(el.scrollTop+focus.y)*k-focus.y;
+      });
+    }
+    function onEnd(e){
+      if(pinch){if(e.touches.length<2)pinch=null;return;}
+      const g=gesture;gesture=null;
+      if(!g||e.touches.length||!e.changedTouches.length)return;
+      if(useStore.getState().scrollMode&&pdf.kind!=='epub')return; // continuous view scrolls naturally
+      if(document.querySelector('[aria-modal="true"]'))return;
+      const sel=window.getSelection();if(sel&&!sel.isCollapsed)return; // finger was selecting text
+      const t=e.changedTouches[0];
+      const dir=touchPageTurn({dx:t.clientX-g.x,dy:t.clientY-g.y,ms:Date.now()-g.at,start:g.start,end:position(),
+        clientWidth:el.clientWidth,scrollWidth:el.scrollWidth,clientHeight:el.clientHeight,scrollHeight:el.scrollHeight});
+      // Sideways swipes flip like a book and land at the top; pulling past the end of a page keeps reading flow.
+      if(dir)turnRef.current(dir,Math.abs(t.clientX-g.x)>Math.abs(t.clientY-g.y)?'top':undefined);
+    }
+    const cancel=()=>{gesture=null;pinch=null;};
+    el.addEventListener('touchstart',onStart,{passive:true});
+    el.addEventListener('touchmove',onMove,{passive:true});
+    el.addEventListener('touchend',onEnd,{passive:true});
+    el.addEventListener('touchcancel',cancel,{passive:true});
+    return()=>{el.removeEventListener('touchstart',onStart);el.removeEventListener('touchmove',onMove);el.removeEventListener('touchend',onEnd);el.removeEventListener('touchcancel',cancel);};
+  },[pdf]);
+  // Let the browser pan sideways only when the page is wider than the screen (zoomed in).
+  // Otherwise a sideways swipe has nothing to pan, and Chromium/WebView2 would treat the
+  // overscroll as "go back" and leave the app. With panning off, the swipe is ours.
+  useLayoutEffect(()=>{
+    const el=container.current;
+    // Pinch is handled above, so the browser never zooms the whole window.
+    const update=()=>{el.style.touchAction=el.scrollWidth>el.clientWidth+2?'pan-x pan-y':'pan-y';};
+    const observer=new ResizeObserver(update);
+    observer.observe(el);for(const child of el.children)observer.observe(child);
+    update();
+    return()=>observer.disconnect();
+  });
   useLayoutEffect(()=>{
     if(!scroll||pdf.kind==='epub')return;
     ignoreScrollUntil.current=Date.now()+250;

@@ -8,6 +8,7 @@ import { candidates, define, isSingleWord } from '../src/utils/dictionary.js';
 import { filterNotes, ankiFlashcards, parseTags, allTags } from '../src/utils/notes.js';
 import { mergeSync, parseSyncFile, cleanAnnotation, syncFileText } from '../src/utils/sync.js';
 import { annotatePdf } from '../src/utils/annotatedPdf.js';
+import { touchPageTurn, pinchZoom } from '../src/utils/navigation.js';
 
 const at = (h, m = 0) => new Date(2026, 8, 30, h, m);
 const json = body => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body) });
@@ -199,5 +200,40 @@ describe('Annotated PDF copy', () => {
   });
   it('explains that encrypted PDFs cannot be annotated in a copy', async () => {
     await expect(annotatePdf(readFileSync('tests/fixtures/protected.pdf'), [])).rejects.toThrow('encrypted');
+  });
+});
+
+describe('Touch page turning', () => {
+  const view = { clientWidth: 1000, scrollWidth: 1000, clientHeight: 800, scrollHeight: 2000 };
+  const swipe = (dx, dy, extra = {}) => touchPageTurn({ dx, dy, ms: 200, start: { top: 0, left: 0 }, end: { top: 0, left: 0 }, ...view, ...extra });
+  it('turns forward on a left swipe and back on a right swipe', () => {
+    expect(swipe(-200, 10)).toBe(1);
+    expect(swipe(200, -10)).toBe(-1);
+  });
+  it('ignores taps, short drags, slow drags and diagonal movement', () => {
+    expect(swipe(-5, 3)).toBe(0);
+    expect(swipe(-60, 0)).toBe(0);
+    expect(swipe(-300, 0, { ms: 1500 })).toBe(0);
+    expect(swipe(-150, 120)).toBe(0);
+  });
+  it('turns the page when pulling past the bottom or top edge, but not mid-page', () => {
+    const bottom = { top: 1200, left: 0 };
+    expect(swipe(0, -200, { start: bottom, end: bottom })).toBe(1);
+    expect(swipe(0, 200)).toBe(-1);
+    expect(swipe(0, -200, { start: { top: 400, left: 0 }, end: { top: 900, left: 0 } })).toBe(0);
+    expect(swipe(0, -200, { start: { top: 1000, left: 0 }, end: bottom })).toBe(0); // that swipe was a scroll
+  });
+  it('pans a zoomed page before turning, then turns at the edge', () => {
+    const wide = { scrollWidth: 1600 };
+    expect(swipe(-200, 0, { ...wide, start: { top: 0, left: 300 } })).toBe(0);
+    expect(swipe(-200, 0, { ...wide, start: { top: 0, left: 600 } })).toBe(1);
+    expect(swipe(200, 0, { ...wide, start: { top: 0, left: 300 } })).toBe(0);
+    expect(swipe(200, 0, { ...wide, start: { top: 0, left: 0 } })).toBe(-1);
+  });
+  it('converts a pinch into a bounded PDF zoom level', () => {
+    expect(pinchZoom(1.8, 1.5)).toBe(1.5);
+    expect(pinchZoom(0.9, 2)).toBe(1);
+    expect(pinchZoom(1.8, 10)).toBe(4);
+    expect(pinchZoom(1.8, 0.05)).toBe(0.25);
   });
 });

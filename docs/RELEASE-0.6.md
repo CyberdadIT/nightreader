@@ -10,6 +10,7 @@
 
 ### Reading
 - **Mouse wheel** scrolls within a page and turns the page at the top or bottom edge. **Ctrl + wheel** zooms (PDF) or changes text size (EPUB).
+- **Touch** (Surface, tablets, phones): swipe left/right to turn pages; swipe up at the bottom or down at the top of a page to move on or back. Swipes need about 80 px of travel within a second, so taps and slow drags never turn pages. Zoomed in, a swipe pans first and turns only at the page edge. Pinch zooms the page around your fingers; the app window itself no longer zooms, and sideways swipes can't trigger WebView2's swipe-to-go-back.
 - **Password-protected PDFs** prompt for the password; a wrong password asks again. Passwords stay in memory until the app closes and are never saved.
 - **Continuous read aloud** moves on to the next page or chapter and skips blank pages. The **sleep timer** stops after 15–90 minutes, or at the end of the current page or chapter.
 - **Warm light** is a multiply-blended colour layer over the whole window that cuts blue light (about 2700 K at full strength), with an optional evening schedule. The brightness floor is now 5%.

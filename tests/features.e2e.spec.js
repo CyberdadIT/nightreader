@@ -191,3 +191,48 @@ test.describe('read aloud', () => {
     await expect(page.getByRole('spinbutton', { name: 'Current page' })).toHaveValue('1');
   });
 });
+
+test.describe('touch screen (Surface-sized tablet)', () => {
+  test.use({ hasTouch: true, viewport: { width: 1440, height: 960 } });
+  // Real touch events through the Chromium DevTools protocol, as WebView2 on Windows receives them.
+  async function touch(page) {
+    const cdp = await page.context().newCDPSession(page);
+    const box = await page.locator('[data-viewer-scroll]').boundingBox(), cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+    const send = (type, touchPoints) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints });
+    return {
+      cx, cy,
+      async swipe(dx, dy) {
+        await send('touchStart', [{ x: cx - dx / 2, y: cy - dy / 2 }]);
+        for (let i = 1; i <= 8; i++) { await send('touchMove', [{ x: cx - dx / 2 + dx * i / 8, y: cy - dy / 2 + dy * i / 8 }]); await page.waitForTimeout(20); }
+        await send('touchEnd', []);
+      },
+      async pinch(from, to) {
+        await send('touchStart', [{ x: cx - from, y: cy, id: 1 }, { x: cx + from, y: cy, id: 2 }]);
+        for (let i = 1; i <= 10; i++) { const d = from + (to - from) * i / 10; await send('touchMove', [{ x: cx - d, y: cy, id: 1 }, { x: cx + d, y: cy, id: 2 }]); await page.waitForTimeout(100); }
+        await send('touchEnd', []);
+      },
+    };
+  }
+  test('swipes turn pages, never leave the app, and pinch zooms the page not the window', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'Touch is driven through the Chromium protocol');
+    let navigations = 0;
+    await openPdf(page);
+    page.on('framenavigated', f => { if (f === page.mainFrame()) navigations++; });
+    const current = page.getByRole('spinbutton', { name: 'Current page' }), viewer = page.locator('[data-viewer-scroll]');
+    const t = await touch(page);
+    await t.swipe(-500, 0); await expect(current).toHaveValue('2');
+    await t.swipe(-500, 0); await expect(current).toHaveValue('3');
+    await t.swipe(500, 0); await expect(current).toHaveValue('2');
+    await expect.poll(() => viewer.evaluate(el => el.scrollTop)).toBeLessThan(5);
+    await t.swipe(-40, 0); await page.waitForTimeout(300); await expect(current).toHaveValue('2');
+    await viewer.evaluate(el => { el.scrollTop = el.scrollHeight; });
+    await t.swipe(0, -400); await expect(current).toHaveValue('3');
+    await t.swipe(0, 400); await expect(current).toHaveValue('2');
+    await expect.poll(() => viewer.evaluate(el => el.scrollHeight - el.clientHeight - el.scrollTop)).toBeLessThan(5);
+    await t.pinch(100, 250);
+    await expect.poll(() => page.getByLabel('Zoom level').inputValue().then(Number)).toBeGreaterThan(150);
+    expect(await page.evaluate(() => visualViewport.scale)).toBe(1);
+    await expect(page.getByLabel('Page fit')).toHaveValue('manual');
+    expect(navigations).toBe(0);
+  });
+});

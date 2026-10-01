@@ -17,6 +17,12 @@ const GROUPS = [
     [<><K>Ctrl</K><K>0</K></>, 'Reset zoom to 100%'],
     [<K>R</K>, 'Focus mode on / off'],
   ]],
+  ['Touch screen', [
+    ['Swipe left / right', 'Next / previous page or chapter'],
+    ['Swipe up at the bottom of a page', 'Next page; swipe down at the top for the previous one'],
+    ['Pinch', 'Zoom a PDF, or change EPUB text size'],
+    ['Long-press and drag', 'Select text to highlight, note or define'],
+  ]],
   ['Tools', [
     [<><K>Ctrl</K><K>F</K></>, 'Find in document'],
     [<K>Esc</K>, 'Close search or a dialog'],

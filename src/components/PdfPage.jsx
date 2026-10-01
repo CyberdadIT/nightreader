@@ -59,9 +59,9 @@ export default function PdfPage({pdf,pageNumber,availableWidth,availableHeight,s
     return()=>{cancelled=true;task?.cancel();layer?.cancel();canvas.width=0;canvas.height=0;root.innerHTML='';};
   },[page,near,scale,rotation,ocr]);
   const filters={dark:'brightness(.8)',light:'none',sepia:'sepia(.5)',amoled:'brightness(.45)',green:'sepia(1) hue-rotate(65deg)',night:'brightness(.8) saturate(.9)',nightContrast:'contrast(1.45)',twilight:'sepia(.2) hue-rotate(240deg)',console:'sepia(.8) brightness(.75)'};
-  return <div ref={boxRef} data-page={pageNumber} style={{width,height,position:'relative',flexShrink:0,background:'#fff',boxShadow:'0 3px 20px #0008',overflow:'hidden'}}>
+  return <div ref={boxRef} data-page={pageNumber} data-scale={scale} style={{width,height,position:'relative',flexShrink:0,background:'#fff',boxShadow:'0 3px 20px #0008',overflow:'hidden'}}>
     <canvas ref={canvasRef} style={{width,height,display:'block',filter:invert?'invert(1) hue-rotate(180deg)':filters[mode]||'none'}}/>
-    <div ref={textRef} className="textLayer" data-text-root data-page-number={pageNumber} style={{width,height,touchAction:'pan-y pinch-zoom'}} aria-label={`Page ${pageNumber} text`}/>
+    <div ref={textRef} className="textLayer" data-text-root data-page-number={pageNumber} style={{width,height}} aria-label={`Page ${pageNumber} text`}/>
     <TextDecorations rootRef={textRef} ready={ready} page={pageNumber} viewport={viewport} layoutKey={`${scale}:${rotation}`}/>
     {error&&<p role="alert" style={{position:'absolute',top:20,left:20,color:'#900'}}>{error}</p>}
   </div>;

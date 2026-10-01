@@ -10,6 +10,8 @@
 
 ### Reading
 - Mouse wheel now scrolls through a page and turns to the next or previous page at the bottom or top edge, in page-by-page and two-page views. Ctrl + wheel zooms PDFs and resizes EPUB text.
+- Touch screens (Surface and other tablets): swipe left or right to turn the page, or swipe up/down past the end of a page. When zoomed in, a swipe pans across the page first. Pinch zooms the PDF (or EPUB text) instead of the whole window.
+- A sideways swipe can no longer trigger the web view's "go back" gesture and leave the app.
 - Password-protected PDFs ask for their password. It is kept only until you close the app.
 - Read aloud carries on to the next page or chapter, skipping blank pages, with a sleep timer (15–90 minutes, or end of the current page/chapter).
 - Warm light removes blue light from the whole window, optionally only during evening hours. Brightness goes lower than before.

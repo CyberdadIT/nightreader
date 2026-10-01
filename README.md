@@ -181,6 +181,8 @@ nightreader/
 | `Space` | Scroll down a screen; at the bottom, next page |
 | Mouse wheel | Scroll; one more notch at the edge turns the page |
 | `Ctrl + mouse wheel` | Zoom a PDF / resize EPUB text |
+| Swipe left / right (touch) | Next / previous page |
+| Pinch (touch) | Zoom a PDF / resize EPUB text |
 | `+ / −` | Zoom in / out |
 | `Ctrl + 0` | Reset zoom |
 | `Ctrl + F` | Find in document |
