@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- Android release builds are now signed with your own key (kept in GitHub secrets) and the APK is attached to each GitHub release. Pull requests check the signing setup with a throwaway key. See docs/ANDROID-SIGNING.md.
+
 ## [0.8.0] — pen, read along, study and privacy
 
 ### Reading
