@@ -5,6 +5,8 @@
 import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate';
 import { useStore } from '../store/useStore.js';
 import { cleanAnnotation, cleanBookmark } from './sync.js';
+import { cleanCards } from './flashcards.js';
+import { cleanLog, mergeLogs } from './stats.js';
 import { loadPdfData, savePdfData, documentId, saveSnapshot } from './storage.js';
 
 export const BACKUP_FORMAT = 'nightreader-backup';
@@ -19,7 +21,7 @@ export async function makeBackup({ includeDocuments = false } = {}) {
     appVersion: typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '',
     library: s.library.map(({ needsFile, ...d }) => d), collections: s.collections,
     annotations: s.annotations, deletedAnnotations: s.deletedAnnotations, bookmarks: s.bookmarks,
-    readingPace: s.readingPace, settings: Object.fromEntries(SETTINGS.map(k => [k, s[k]])),
+    readingPace: s.readingPace, cards: s.cards, readingLog: s.readingLog, docStats: s.docStats, settings: Object.fromEntries(SETTINGS.map(k => [k, s[k]])),
   };
   const files = { 'backup.json': strToU8(JSON.stringify(data)) };
   let documents = 0, missing = 0;
@@ -70,6 +72,9 @@ export function readBackup(bytes) {
     annotations: arr(data.annotations).map(a => cleanAnnotation(a)).filter(Boolean),
     bookmarks: arr(data.bookmarks).map(b => cleanBookmark(b)).filter(Boolean),
     readingPace: data.readingPace && typeof data.readingPace === 'object' ? data.readingPace : {},
+    cards: cleanCards(data.cards),
+    readingLog: cleanLog(data.readingLog),
+    docStats: data.docStats && typeof data.docStats === 'object' ? Object.fromEntries(Object.entries(data.docStats).filter(([id, v]) => /^[0-9a-f]{64}$/.test(id) && v && typeof v === 'object').map(([id, v]) => [id, { ms: Math.max(0, Number(v.ms) || 0), pages: Math.max(0, Math.floor(Number(v.pages) || 0)), ...(Number.isFinite(v.finishedAt) ? { finishedAt: v.finishedAt } : {}), ...(Number.isFinite(v.lastReadAt) ? { lastReadAt: v.lastReadAt } : {}) }])) : {},
     settings: data.settings && typeof data.settings === 'object' ? data.settings : {},
     documents,
   };
@@ -123,6 +128,10 @@ export async function restoreBackup(bytes) {
     library, annotations: merged.annotations, deletedAnnotations: merged.deletedAnnotations, bookmarks: merged.bookmarks,
     collections: [...new Set([...s.collections, ...backup.collections])],
     readingPace: { ...backup.readingPace, ...s.readingPace },
+    readingLog: mergeLogs(s.readingLog || {}, backup.readingLog),
+    docStats: { ...backup.docStats, ...Object.fromEntries(Object.entries(s.docStats || {}).filter(([id, v]) => (v.ms || 0) >= (backup.docStats[id]?.ms || 0))) },
+    // Flashcard progress: the more recently studied schedule wins.
+    cards: Object.fromEntries([...new Set([...Object.keys(backup.cards || {}), ...Object.keys(s.cards || {})])].map(id => [id, ((backup.cards || {})[id]?.last || 0) > ((s.cards || {})[id]?.last || 0) ? backup.cards[id] : s.cards[id]])),
     // On a new device, reading settings come back too; otherwise this device's settings stay.
     ...(fresh ? Object.fromEntries(SETTINGS.filter(k => backup.settings[k] !== undefined).map(k => [k, backup.settings[k]])) : {}),
   });

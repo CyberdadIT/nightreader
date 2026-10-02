@@ -1,6 +1,6 @@
 {
   "name": "nightreader",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "private": false,
   "description": "NightReader — offline PDF and EPUB reader with notes, read aloud and OCR",
   "author": "NightReader Contributors",

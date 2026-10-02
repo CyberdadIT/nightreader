@@ -17,11 +17,13 @@ export function useKeyboardShortcuts({ onNextPage, onPrevPage, onHelp, onPrint, 
       // Dialogs handle their own keys.
       if (document.querySelector('[aria-modal="true"]')) return;
       if (e.key === "?") { e.preventDefault(); onHelp?.(); return; }
+      // Ctrl+Z undoes the last pen stroke or erase.
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") { if (useStore.getState().undoInk()) e.preventDefault(); return; }
       // Ctrl+P prints the document, not the reader's interface.
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") { e.preventDefault(); onPrint?.(); return; }
 
       // Find the scrollable viewer container
-      const viewerEl = document.querySelector("[data-viewer-scroll]");
+      const viewerEl = document.querySelector('[data-viewer-scroll][data-active="true"]') || document.querySelector("[data-viewer-scroll]");
 
       // In a right-to-left book the left arrow moves forward, as pages turn that way.
       const key = rtl && e.key === "ArrowRight" ? "ArrowLeft" : rtl && e.key === "ArrowLeft" ? "ArrowRight" : e.key;

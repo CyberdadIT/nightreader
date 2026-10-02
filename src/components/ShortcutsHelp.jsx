@@ -23,6 +23,12 @@ const GROUPS = [
     ['Pinch', 'Zoom a PDF, or change EPUB text size'],
     ['Long-press and drag', 'Select text to highlight, note or define'],
   ]],
+  ['Surface Pen and other styluses (PDF)', [
+    ['Write on the page', 'Draws ink straight away; no tool needed'],
+    ['Turn the pen over', 'The eraser end removes strokes it touches'],
+    [<><K>Ctrl</K><K>Z</K></>, 'Undo the last stroke or erase'],
+    ['✒ Ink in the toolbar', 'Draw with a mouse too; choose colour and thickness'],
+  ]],
   ['Tools', [
     [<><K>Ctrl</K><K>F</K></>, 'Find in document'],
     [<><K>Ctrl</K><K>P</K></>, 'Print'],

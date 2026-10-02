@@ -14,7 +14,9 @@ export class PasswordCancelled extends Error {
 export async function loadDocument(bytes, kind, id, { askPassword } = {}) {
   if (kind === 'epub') {
     const { loadEpub } = await import('./epub.js');
-    return loadEpub(bytes);
+    const book = await loadEpub(bytes);
+    book.documentId = id;
+    return book;
   }
   // No eval: closes the class of bug behind CVE-2024-4367. No embedded PDF JavaScript either.
   const task = pdfjs.getDocument({data:new Uint8Array(bytes).slice(), isEvalSupported:false, enableScripting:false});

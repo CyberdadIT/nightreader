@@ -21,7 +21,11 @@ export default function SearchBar({pdf}) {
         }
         if(run!==generation.current)return;
         useStore.getState().setSearchResults(matches);
-        if(matches.length){useStore.getState().setCurrentPage(matches[0].page);useStore.getState().setSelectedMatch(matches[0]);}
+        if(matches.length){
+          // Start at the first match from the current page on (e.g. after jumping here from library search).
+          const here=useStore.getState().getActiveTab()?.page||1,first=Math.max(0,matches.findIndex(m=>m.page>=here));
+          setIndex(first);useStore.getState().setCurrentPage(matches[first].page);useStore.getState().setSelectedMatch(matches[first]);
+        }
       }catch(e){if(run===generation.current)setError(e.message);}
       finally{if(run===generation.current)setBusy(false);}
     },250);

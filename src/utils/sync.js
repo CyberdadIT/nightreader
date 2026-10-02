@@ -1,3 +1,4 @@
+import { cleanInk } from './ink.js';
 // Folder sync: reading positions, highlights and notes are merged through a JSON
 // file in a folder the user chooses (for example OneDrive). Document files are not
 // copied; a document is matched on each device by its content, so the same PDF or
@@ -12,7 +13,7 @@ const CLOCK_SKEW_MS = 5 * 60 * 1000;
 const notFuture = (t, now) => (Number.isFinite(t) && t > 0 ? Math.min(t, now) : 0);
 /** Removing this many notes in one sync waits for the user to confirm. */
 export const CONFIRM_REMOVALS = 5;
-const TYPES = new Set(['hl-yellow', 'hl-blue', 'hl-pink', 'hl-green', 'underline', 'strikethrough', 'note']);
+const TYPES = new Set(['hl-yellow', 'hl-blue', 'hl-pink', 'hl-green', 'underline', 'strikethrough', 'note', 'ink']);
 
 const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
 const num = v => (Number.isFinite(v) ? v : 0);
@@ -22,6 +23,7 @@ export function cleanAnnotation(a, now = Date.now() + CLOCK_SKEW_MS) {
   if (!a || typeof a !== 'object' || typeof a.id !== 'string' || typeof a.filePath !== 'string' || !TYPES.has(a.type)) return null;
   const page = Math.floor(num(a.page));
   if (page < 1) return null;
+  if (a.type === 'ink' && !cleanInk(a.ink)) return null;
   const rects = Array.isArray(a.pdfRects)
     ? a.pdfRects.filter(r => Array.isArray(r) && r.length === 4 && r.every(Number.isFinite)).slice(0, 500) : undefined;
   return {
@@ -30,6 +32,7 @@ export function cleanAnnotation(a, now = Date.now() + CLOCK_SKEW_MS) {
     tags: Array.isArray(a.tags) ? a.tags.filter(t => typeof t === 'string').map(t => t.slice(0, 60)).slice(0, 20) : [],
     ...(Number.isFinite(a.start) ? { start: a.start } : {}), ...(Number.isFinite(a.end) ? { end: a.end } : {}),
     ...(rects?.length ? { pdfRects: rects } : {}),
+    ...(a.type === 'ink' ? { ink: cleanInk(a.ink) } : {}),
     createdAt: notFuture(a.createdAt, now), updatedAt: notFuture(a.updatedAt, now),
   };
 }

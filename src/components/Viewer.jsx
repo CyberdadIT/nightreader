@@ -7,9 +7,9 @@ import EpubChapter from './EpubChapter.jsx';
 import DefinitionCard from './DefinitionCard.jsx';
 import {isSingleWord} from '../utils/dictionary.js';
 import styles from './Viewer.module.css';
-export default function Viewer({pdf}) {
+export default function Viewer({pdf,tabId}) {
   const container=useRef(null),scrollPage=useRef(null), ignoreScrollUntil=useRef(0);
-  const tab=useStore(s=>s.getActiveTab()),scroll=useStore(s=>s.scrollMode),spread=useStore(s=>s.spread),brightness=useStore(s=>s.brightness),mode=useStore(s=>s.readingMode);
+  const tab=useStore(s=>s.tabs.find(t=>t.id===tabId)),active=useStore(s=>s.activeTabId===tabId),scroll=useStore(s=>s.scrollMode),spread=useStore(s=>s.spread),brightness=useStore(s=>s.brightness),mode=useStore(s=>s.readingMode);
   const navigationVersion=useStore(s=>s.navigationVersion);
   const page=tab?.page||1,[size,setSize]=useState({width:800,height:600}),[popup,setPopup]=useState(null),[lookup,setLookup]=useState(null),[message,setMessage]=useState('');
   useEffect(()=>{
@@ -31,11 +31,11 @@ export default function Viewer({pdf}) {
   // Turn one page (two in two-page view) forward or back. Returns false at either end of the document.
   // edge: where to land on the new page ('top' or 'bottom').
   function turnPage(dir,edge=dir>0?'top':'bottom'){
-    const s=useStore.getState(),current=s.getActiveTab();if(!current)return false;
+    const s=useStore.getState(),current=s.tabs.find(t=>t.id===tabId);if(!current)return false;
     const step=s.spread&&pdf.kind!=='epub'?2:1,total=current.totalPages||1;
     if(dir>0?current.page+step>total:current.page<=1)return false;
     enterEdge.current=edge;
-    s.setCurrentPage(current.page+dir*step);return true;
+    s.setCurrentPage(current.page+dir*step,false,tabId);return true;
   }
   const turnRef=useRef(turnPage);turnRef.current=turnPage;
   // Mouse wheel and trackpad. Ctrl+wheel zooms (PDF) or resizes text (EPUB).
@@ -57,7 +57,7 @@ export default function Viewer({pdf}) {
       if(now<wheel.lockUntil){if(Math.sign(dy)===wheel.dir)e.preventDefault();return;}
       const dir=wheelPageTurn({deltaX:e.deltaX,deltaY:dy,scrollTop:el.scrollTop,clientHeight:el.clientHeight,scrollHeight:el.scrollHeight});
       if(!dir){wheel.acc=0;return;}
-      const current=s.getActiveTab();if(!current)return;
+      const current=s.tabs.find(t=>t.id===tabId);if(!current)return;
       const step=s.spread&&pdf.kind!=='epub'?2:1,total=current.totalPages||1;
       if(dir>0?current.page+step>total:current.page<=1){wheel.acc=0;return;}
       e.preventDefault();
@@ -69,7 +69,7 @@ export default function Viewer({pdf}) {
     }
     el.addEventListener('wheel',onWheel,{passive:false});
     return()=>el.removeEventListener('wheel',onWheel);
-  },[pdf]);
+  },[pdf,tabId]);
   // Touch screens (Surface, tablets, phones): swipe left/right to turn the page, or
   // swipe up/down past the end of a page. Listeners are passive, so normal touch
   // scrolling and pinch-zoom are untouched; the decision is made when the finger lifts.
@@ -126,6 +126,16 @@ export default function Viewer({pdf}) {
     el.addEventListener('touchcancel',cancel,{passive:true});
     return()=>{el.removeEventListener('touchstart',onStart);el.removeEventListener('touchmove',onMove);el.removeEventListener('touchend',onEnd);el.removeEventListener('touchcancel',cancel);};
   },[pdf]);
+  // Surface Pen and other styluses: while a pen hovers in range, the ink layer takes its
+  // input (so the pen writes instead of scrolling or selecting); fingers keep scrolling.
+  useEffect(()=>{
+    if(pdf.kind==='epub')return;
+    const el=container.current,s=useStore.getState;let timer;
+    const near=e=>{if(e.pointerType!=='pen')return;s().setPenNear(true);clearTimeout(timer);timer=setTimeout(()=>s().setPenNear(false),8000);};
+    const gone=e=>{if(e.pointerType==='pen'&&!e.relatedTarget){clearTimeout(timer);s().setPenNear(false);}};
+    el.addEventListener('pointerover',near);el.addEventListener('pointermove',near);el.addEventListener('pointerdown',near);el.addEventListener('pointerout',gone);
+    return()=>{clearTimeout(timer);s().setPenNear(false);el.removeEventListener('pointerover',near);el.removeEventListener('pointermove',near);el.removeEventListener('pointerdown',near);el.removeEventListener('pointerout',gone);};
+  },[pdf]);
   // Let the browser pan sideways only when the page is wider than the screen (zoomed in).
   // Otherwise a sideways swipe has nothing to pan, and Chromium/WebView2 would treat the
   // overscroll as "go back" and leave the app. With panning off, the swipe is ours.
@@ -166,7 +176,7 @@ export default function Viewer({pdf}) {
     if(!scroll||pdf.kind==='epub'||Date.now()<ignoreScrollUntil.current)return;
     const el=container.current,top=el.getBoundingClientRect().top;let best=page,distance=Infinity;
     el.querySelectorAll('[data-page]').forEach(p=>{const d=Math.abs(p.getBoundingClientRect().top-top);if(d<distance){distance=d;best=Number(p.dataset.page);}});
-    if(best!==page){scrollPage.current=best;useStore.getState().setCurrentPage(best,true);}
+    if(best!==page){scrollPage.current=best;useStore.getState().setCurrentPage(best,true,tabId);}
   }
   const pages=scroll?Array.from({length:pdf.numPages},(_,i)=>i+1):spread?[page,...(page<pdf.numPages?[page+1]:[])]:[page];
   return <div style={{flex:1,minHeight:0,position:'relative',display:'flex',flexDirection:'column'}}>
@@ -179,7 +189,7 @@ export default function Viewer({pdf}) {
       {['yellow','blue','pink','green'].map(c=><button key={c} aria-label={`Highlight ${c}`} onClick={()=>annotate(`hl-${c}`)} style={{background:{yellow:'#ffdf00',blue:'#4fc3f7',pink:'#f48fb1',green:'#a5d6a7'}[c],color:'#111'}}>●</button>)}
       <button onClick={()=>annotate('underline')}>Underline</button><button onClick={()=>annotate('strikethrough')}>Strike</button><button onClick={()=>annotate('note')}>Note</button><button aria-label="Close selection actions" onClick={()=>{setPopup(null);window.getSelection()?.removeAllRanges();}}>×</button>
     </div>}
-    <div ref={container} data-viewer-scroll tabIndex={0} role="region" aria-label={pdf.kind==='epub'?'Book text':'Document pages'} onScroll={onScroll} className={styles.readingArea} style={{background:mode==='light'?'#ddd':mode==='sepia'?'#bfae8c':'#0d1117',flexDirection:spread&&pdf.kind==='pdf'?'row':'column',alignItems:spread?'flex-start':'center'}}>
+    <div ref={container} data-viewer-scroll data-doc={tab?.path} data-active={active?'true':'false'} tabIndex={0} role="region" aria-label={pdf.kind==='epub'?'Book text':'Document pages'} onScroll={onScroll} className={styles.readingArea} style={{background:mode==='light'?'#ddd':mode==='sepia'?'#bfae8c':'#0d1117',flexDirection:spread&&pdf.kind==='pdf'?'row':'column',alignItems:spread?'flex-start':'center'}}>
       {pdf.kind==='epub'?<EpubChapter book={pdf} page={page} available={size}/>:pages.map(n=><PdfPage key={`${tab.path}:${n}`} pdf={pdf} pageNumber={n} availableWidth={spread?(size.width-16)/2:size.width} availableHeight={size.height} scrollRoot={container}/>)}
     </div>
   </div>;

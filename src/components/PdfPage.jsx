@@ -5,6 +5,7 @@ import {useStore} from '../store/useStore.js';
 import {loadOcrPage} from '../utils/storage.js';
 import {fitScale} from '../utils/annotations.js';
 import TextDecorations from './TextDecorations.jsx';
+import InkLayer from './InkLayer.jsx';
 export default function PdfPage({pdf,pageNumber,availableWidth,availableHeight,scrollRoot}) {
   const boxRef=useRef(null),canvasRef=useRef(null),textRef=useRef(null),annotRef=useRef(null);
   const [near,setNear]=useState(false),[page,setPage]=useState(null),[ready,setReady]=useState(false),[ocr,setOcr]=useState(null),[error,setError]=useState('');
@@ -75,7 +76,8 @@ export default function PdfPage({pdf,pageNumber,availableWidth,availableHeight,s
     <canvas ref={canvasRef} style={{width,height,display:'block',filter:invert?'invert(1) hue-rotate(180deg)':filters[mode]||'none'}}/>
     <div ref={textRef} className="textLayer" data-text-root data-page-number={pageNumber} style={{width,height}} aria-label={`Page ${pageNumber} text`}/>
     <div ref={annotRef} className="annotationLayer" style={{position:'absolute',inset:0,zIndex:3}}/>
-    <TextDecorations rootRef={textRef} ready={ready} page={pageNumber} viewport={viewport} layoutKey={`${scale}:${rotation}`}/>
+    <TextDecorations rootRef={textRef} ready={ready} page={pageNumber} viewport={viewport} layoutKey={`${scale}:${rotation}`} docPath={pdf.documentId}/>
+    {near&&<InkLayer pageNumber={pageNumber} viewport={viewport} filePath={pdf.documentId} scrollRoot={scrollRoot}/>}
     {error&&<p role="alert" style={{position:'absolute',top:20,left:20,color:'#900'}}>{error}</p>}
   </div>;
 }

@@ -55,3 +55,35 @@ test('settings and shortcut dialogs', async ({ page }) => {
   await settings.getByRole('button', { name: 'Keyboard, mouse and touch shortcuts' }).click();
   expect(await audit(page, '[role="dialog"]')).toEqual([]);
 });
+
+test('library search, flashcards and statistics', async ({ page }) => {
+  await importFile(page, 'reading.pdf');
+  await expect(page.locator('[data-text-root]').first()).toContainText('NightReader chapter 1');
+  await page.getByRole('button', { name: 'Reading statistics' }).click();
+  expect(await audit(page, '[role="dialog"]')).toEqual([]);
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Library', exact: true }).click();
+  await page.getByRole('tab', { name: 'Search text' }).click();
+  await page.getByRole('searchbox', { name: 'Search inside all documents' }).fill('chapter 3');
+  await expect(page.getByRole('article', { name: 'reading.pdf' })).toBeVisible();
+  expect(await audit(page)).toEqual([]);
+  await page.getByRole('tab', { name: 'Review flashcards' }).click();
+  expect(await audit(page)).toEqual([]);
+});
+
+test('side by side and the ink tools', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'Desktop layout');
+  await importFile(page, 'reading.pdf');
+  await expect(page.locator('[data-text-root]').first()).toContainText('NightReader chapter 1');
+  await page.getByRole('button', { name: '✒ Ink' }).click();
+  await page.getByRole('button', { name: '◫ Side by side' }).click();
+  await expect(page.locator('[data-pane]')).toHaveCount(2);
+  expect(await audit(page)).toEqual([]);
+});
+
+test('lock screen', async ({ page }) => {
+  await page.evaluate(() => localStorage.setItem('nightreader-lock', JSON.stringify({ v: 1, salt: 'AAAAAAAAAAAAAAAAAAAAAA==', iv: 'AAAAAAAAAAAAAAAA', wrapped: 'AAAA', iterations: 600000 })));
+  await page.reload();
+  await expect(page.getByRole('form', { name: 'Unlock NightReader' })).toBeVisible();
+  expect(await audit(page)).toEqual([]);
+});

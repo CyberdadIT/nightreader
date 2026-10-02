@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.8.0] — pen, read along, study and privacy
+
+### Reading
+- **Surface Pen ink on PDFs.** Write straight onto the page with a pen; no tool to pick first. Pressure changes the line width, the eraser end removes strokes, and Ctrl+Z undoes. ✒ Ink in the toolbar lets a mouse draw too, with five colours and three thicknesses. Fingers keep scrolling. Strokes sync, go into backups, and are written into annotated PDF copies as standard ink annotations.
+- **Read along.** Read aloud now highlights the sentence being read and the current word, and keeps it on screen. Turn it off with "Follow along".
+- **More voices.** On Windows, NightReader now uses all installed voices, including male ones (for UK English: George, Hazel and Susan; for US English: David, Mark and Zira), with the language and gender shown in the menu and a ▶ Preview button. More voices can be added in Windows Settings → Time & language → Speech.
+- **Side by side.** ◫ Side by side shows two documents, or two places in the same one, each with its own page. Click a pane to make it the one the toolbar and keys control.
+
+### Study
+- **Search every document.** Library → Search text finds words across your whole library (PDF text, OCR text and EPUB chapters), with snippets; opening a result shows the matches in the document. Accents and case don't matter.
+- **Flashcard review.** Library → Review flashcards: every highlight with a note is a card. Space shows the answer and 1–4 grade it; spaced repetition decides when each card comes back.
+- **Reading statistics.** 📊 shows time read today, this week and in total, pages, your streak, a 30-day chart and time per document. Only active reading counts.
+
+### Privacy
+- **App lock with encrypted storage.** Settings → App lock: a passphrase protects NightReader, and everything it stores on the device (library, notes, settings, documents, OCR text, snapshots, search index) is encrypted with AES-256-GCM. It locks after a chosen time without use, or with 🔒.
+- **Password-protected backups** (AES-256-GCM, separate password).
+
+See docs/RELEASE-0.8.md for details and limits.
+
 ## [0.7.0] — security hardening, safer notes, and the gaps from the 0.6 review
 
 ### Security (findings from the 0.6 security review)

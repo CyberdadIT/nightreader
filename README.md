@@ -30,8 +30,13 @@
 - Sync on phones through the same sync file (open it from OneDrive/Drive/iCloud, save the merged copy back); bookmarks sync too.
 - Android and iOS: open PDFs and EPUBs from other apps ("Open with" / "Open in").
 - OCR in 22 more languages, downloaded on request and checked against pinned SHA-256 hashes.
+- Surface Pen ink on PDFs (pressure, eraser end, undo), saved into annotated PDF copies.
+- Read along: sentence and word highlighting during read aloud; all installed Windows voices, male and female.
+- Side-by-side reading of two documents or two places in one.
+- Search inside every document in the library; flashcard review with spaced repetition; reading statistics.
+- App lock with AES-256 encryption of everything stored on the device; password-protected backups.
 
-Read the [0.7 release notes](docs/RELEASE-0.7.md), [0.6 release details](docs/RELEASE-0.6.md) and the [0.5 platform validation notes](docs/RELEASE-0.5.md) for supported formats, OCR/speech behaviour, local-storage limits and native build instructions. Windows, Android and iOS are the priority targets; Linux releases are deferred.
+Read the [0.8 release notes](docs/RELEASE-0.8.md), [0.7 release notes](docs/RELEASE-0.7.md), [0.6 release details](docs/RELEASE-0.6.md) and the [0.5 platform validation notes](docs/RELEASE-0.5.md) for supported formats, OCR/speech behaviour, local-storage limits and native build instructions. Windows, Android and iOS are the priority targets; Linux releases are deferred.
 
 ---
 
@@ -187,6 +192,7 @@ nightreader/
 | `Ctrl + 0` | Reset zoom |
 | `Ctrl + F` | Find in document |
 | `Ctrl + P` | Print |
+| `Ctrl + Z` | Undo the last pen stroke |
 | `R` | Toggle focus mode |
 | `Esc` | Close search or a dialog |
 | `?` | Show all shortcuts in the app |
