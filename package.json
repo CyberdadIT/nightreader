@@ -1,8 +1,8 @@
 {
   "name": "nightreader",
-  "version": "0.5.0",
+  "version": "0.7.0",
   "private": false,
-  "description": "NightReader \u2014 offline PDF and EPUB reader with notes, read aloud and OCR",
+  "description": "NightReader — offline PDF and EPUB reader with notes, read aloud and OCR",
   "author": "NightReader Contributors",
   "license": "GPL-3.0",
   "type": "module",
@@ -17,17 +17,21 @@
     "cap:android": "npx cap open android",
     "cap:ios": "npx cap open ios",
     "lint": "eslint src scripts tests",
+    "pretest": "npm run prepare:dictionary",
     "test": "vitest run",
     "prepare:ocr": "node scripts/prepare-ocr.mjs",
-    "prebuild": "npm run prepare:ocr",
-    "predev": "npm run prepare:ocr",
-    "test:e2e": "playwright test"
+    "prebuild": "npm run prepare:assets",
+    "predev": "npm run prepare:assets",
+    "test:e2e": "playwright test",
+    "prepare:dictionary": "node scripts/prepare-dictionary.mjs",
+    "prepare:assets": "npm run prepare:ocr && npm run prepare:dictionary"
   },
   "dependencies": {
-    "@capacitor-community/text-to-speech": "^5.1.0",
+    "@capacitor-community/text-to-speech": "^8.0.2",
     "@tesseract.js-data/eng": "^1.0.0",
     "dompurify": "^3.4.16",
     "fflate": "^0.8.3",
+    "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^4.4.168",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -35,26 +39,35 @@
     "zustand": "^4.5.4"
   },
   "devDependencies": {
-    "@capacitor/android": "^6.1.2",
-    "@capacitor/cli": "^6.1.2",
-    "@capacitor/core": "^6.1.2",
-    "@capacitor/filesystem": "^6.0.1",
-    "@capacitor/ios": "^6.1.2",
-    "@capacitor/share": "^6.0.1",
-    "@capacitor/status-bar": "^6.0.1",
+    "@axe-core/playwright": "^4.13.0",
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/app": "^8.0.0",
+    "@capacitor/cli": "^8.0.0",
+    "@capacitor/core": "^8.0.0",
+    "@capacitor/filesystem": "^8.0.0",
+    "@capacitor/ios": "^8.0.0",
+    "@capacitor/share": "^8.0.0",
+    "@capacitor/status-bar": "^8.0.0",
     "@playwright/test": "^1.58.2",
     "@tauri-apps/api": "^2.0.0",
     "@tauri-apps/cli": "^2.0.0",
     "@tauri-apps/plugin-dialog": "^2.0.0",
     "@tauri-apps/plugin-fs": "^2.0.0",
+    "@tauri-apps/plugin-opener": "~2.7.0",
     "@types/react": "^18.3.5",
     "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
+    "@vitejs/plugin-react": "^6.1.1",
     "eslint": "^9.9.0",
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^30.1.1",
     "typescript": "^6.0.2",
-    "vite": "^5.4.1",
-    "vitest": "^2.0.5"
+    "vite": "^8.3.2",
+    "vitest": "^5.0.3",
+    "wordnet-db": "^3.1.14"
+  },
+  "overrides": {
+    "xcode": {
+      "uuid": "^11.1.1"
+    }
   }
 }

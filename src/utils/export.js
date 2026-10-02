@@ -1,7 +1,10 @@
+// Markdown viewers often render raw HTML, so angle brackets and ampersands from a
+// document's text are written as entities: they display the same and can't run.
+export const escapeMarkdownHtml = value => String(value || '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 export function notesMarkdown(name, notes, kind = 'pdf') {
   const position = kind === 'epub' ? 'Chapter' : 'Page';
   const ordered = [...notes].sort((a,b) => a.page-b.page);
-  return `# Notes: ${name}\n\n` + ordered.map(a => `## ${position} ${a.page}\n\n> ${String(a.quote || '').replace(/\r?\n/g, '\n> ')}\n\n${a.note || ''}\n`).join('\n');
+  return `# Notes: ${escapeMarkdownHtml(name)}\n\n` + ordered.map(a => `## ${position} ${a.page}\n\n> ${escapeMarkdownHtml(a.quote).replace(/\r?\n/g, '\n> ')}\n\n${escapeMarkdownHtml(a.note)}\n`).join('\n');
 }
 export function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

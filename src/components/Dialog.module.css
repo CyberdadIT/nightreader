@@ -1,0 +1,96 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.dialog {
+  width: min(520px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 12px 40px #000a;
+  padding: 20px 22px;
+}
+
+.wide { width: min(760px, 100%); }
+.dialog:focus { outline: none; }
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.header h2 { font-size: 17px; font-weight: 600; }
+
+.close {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: var(--radius);
+  width: 32px;
+  height: 32px;
+}
+
+.dialog p { color: var(--muted); font-size: 13px; line-height: 1.5; margin-bottom: 10px; }
+.dialog h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 0 8px; }
+.dialog h3:first-of-type { margin-top: 4px; }
+
+.dialog input[type="password"],
+.dialog input[type="text"],
+.dialog input[type="search"],
+.dialog input[type="time"],
+.dialog select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+
+.actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; margin-top: 16px; }
+
+.dialog button:not(.close) {
+  padding: 7px 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.dialog button.primary { background: var(--accent); border-color: var(--accent); color: #041018; font-weight: 600; }
+
+.error { color: var(--danger) !important; }
+
+.keys { width: 100%; border-collapse: collapse; font-size: 13px; }
+.keys td { padding: 6px 4px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+.keys td:first-child { white-space: nowrap; width: 40%; }
+
+kbd {
+  display: inline-block;
+  min-width: 22px;
+  padding: 1px 6px;
+  margin: 0 2px 2px 0;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--surface);
+  font: 12px var(--font-mono);
+  text-align: center;
+}

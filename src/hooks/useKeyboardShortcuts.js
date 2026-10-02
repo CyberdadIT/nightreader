@@ -1,9 +1,8 @@
 import { useEffect } from "react";
 import { useStore } from "../store/useStore.js";
+import { stepZoom } from "../utils/navigation.js";
 
-const ZOOM_STEPS = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0];
-
-export function useKeyboardShortcuts({ onNextPage, onPrevPage }) {
+export function useKeyboardShortcuts({ onNextPage, onPrevPage, onHelp, onPrint, rtl = false }) {
   const toggleSearch    = useStore((s) => s.toggleSearch);
   const toggleFocusMode = useStore((s) => s.toggleFocusMode);
   const setZoom         = useStore((s) => s.setZoom);
@@ -15,11 +14,19 @@ export function useKeyboardShortcuts({ onNextPage, onPrevPage }) {
     const handler = (e) => {
       const tag = document.activeElement?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      // Dialogs handle their own keys.
+      if (document.querySelector('[aria-modal="true"]')) return;
+      if (e.key === "?") { e.preventDefault(); onHelp?.(); return; }
+      // Ctrl+P prints the document, not the reader's interface.
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") { e.preventDefault(); onPrint?.(); return; }
 
       // Find the scrollable viewer container
       const viewerEl = document.querySelector("[data-viewer-scroll]");
 
-      switch (e.key) {
+      // In a right-to-left book the left arrow moves forward, as pages turn that way.
+      const key = rtl && e.key === "ArrowRight" ? "ArrowLeft" : rtl && e.key === "ArrowLeft" ? "ArrowRight" : e.key;
+
+      switch (key) {
 
         // ── Arrow Up / Down: scroll within page, only change page at edges ──
         case "ArrowDown": {
@@ -108,14 +115,12 @@ export function useKeyboardShortcuts({ onNextPage, onPrevPage }) {
 
         case "+":
         case "=": {
-          const next = ZOOM_STEPS.find((s) => s > zoom + 0.01);
-          setZoom(next ?? ZOOM_STEPS[ZOOM_STEPS.length - 1]);
+          setZoom(stepZoom(zoom, 1));
           break;
         }
 
         case "-": {
-          const prev = [...ZOOM_STEPS].reverse().find((s) => s < zoom - 0.01);
-          setZoom(prev ?? ZOOM_STEPS[0]);
+          setZoom(stepZoom(zoom, -1));
           break;
         }
 
@@ -134,5 +139,5 @@ export function useKeyboardShortcuts({ onNextPage, onPrevPage }) {
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [onNextPage, onPrevPage, toggleSearch, toggleFocusMode, setZoom, zoom, searchVisible, scrollMode]);
+  }, [onNextPage, onPrevPage, onHelp, onPrint, rtl, toggleSearch, toggleFocusMode, setZoom, zoom, searchVisible, scrollMode]);
 }

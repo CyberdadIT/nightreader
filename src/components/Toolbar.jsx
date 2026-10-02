@@ -2,13 +2,13 @@ import React from "react";
 import { useStore } from "../store/useStore.js";
 import { openFilePicker } from "../utils/platform.js";
 import styles from "./Toolbar.module.css";
+import { ZOOM_STEPS, stepZoom } from "../utils/navigation.js";
 
 // Zoom steps matching Foxit/Readera behaviour
 // Each step is a meaningful jump — not 10% increments
-const ZOOM_STEPS = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0];
 const ZOOM_LABELS = ["50%", "67%", "75%", "80%", "90%", "100%", "110%", "125%", "150%", "175%", "200%", "250%", "300%", "400%"];
 
-export default function Toolbar({ onFileLoaded }) {
+export default function Toolbar({ onFileLoaded, onPrint }) {
   const activeTab      = useStore((s) => s.getActiveTab());
   const currentPage    = activeTab?.page ?? 1;
   const totalPages     = activeTab?.totalPages ?? 0;
@@ -38,13 +38,11 @@ export default function Toolbar({ onFileLoaded }) {
 
   // Jump to next/previous zoom step
   function zoomIn() {
-    const next = ZOOM_STEPS.find((s) => s > zoom + 0.01);
-    setZoom(next ?? ZOOM_STEPS[ZOOM_STEPS.length - 1]);
+    setZoom(stepZoom(zoom, 1));
   }
 
   function zoomOut() {
-    const prev = [...ZOOM_STEPS].reverse().find((s) => s < zoom - 0.01);
-    setZoom(prev ?? ZOOM_STEPS[0]);
+    setZoom(stepZoom(zoom, -1));
   }
 
   function handleZoomSelect(e) {
@@ -159,6 +157,7 @@ export default function Toolbar({ onFileLoaded }) {
       {/* View */}
       <div className={styles.group}>
         {!epub && <button className={`${styles.btn} ${scrollMode ? styles.active : ""}`} onClick={toggleScrollMode} title="Continuous scroll">☰ Scroll</button>}
+        <button className={styles.btn} onClick={onPrint} title="Print (Ctrl+P)">⎙ Print</button>
         <button className={`${styles.btn} ${invertColors ? styles.active : ""}`} onClick={toggleInvert} title="Invert colours">◑ Invert</button>
         <button className={styles.btn} onClick={toggleFocusMode} title="Focus mode (R)">▭ Focus</button>
       </div>

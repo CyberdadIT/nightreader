@@ -50,16 +50,42 @@ if (Test-Command "node") {
     }
 }
 
+# ── Download integrity helpers ────────────────────────────────────────
+# Never run a downloaded installer unless its hash or signature checks out.
+function Assert-Sha256($Path, $Expected) {
+    $actual = (Get-FileHash -Algorithm SHA256 -Path $Path).Hash.ToLowerInvariant()
+    if ($actual -ne $Expected.Trim().Split(" ")[0].ToLowerInvariant()) {
+        Remove-Item $Path -Force
+        throw "SHA-256 mismatch for $Path. The download was removed and not run."
+    }
+}
+function Assert-MicrosoftSigned($Path) {
+    $sig = Get-AuthenticodeSignature -FilePath $Path
+    if ($sig.Status -ne "Valid" -or $sig.SignerCertificate.Subject -notmatch "O=Microsoft Corporation") {
+        Remove-Item $Path -Force
+        throw "$Path is not validly signed by Microsoft (status: $($sig.Status)). It was removed and not run."
+    }
+}
+
 # ── 2. Rust (via rustup) ──────────────────────────────────────────────
 if (Test-Command "cargo") {
     $rustVer = (cargo --version)
     Write-Skip "Rust $rustVer"
 } else {
-    Write-Step "Installing Rust via rustup-init..."
-    $rustupUrl  = "https://win.rustup.rs/x86_64"
-    $rustupPath = "$env:TEMP\rustup-init.exe"
-    Invoke-WebRequest -Uri $rustupUrl -OutFile $rustupPath
-    & $rustupPath -y --default-toolchain stable --default-host x86_64-pc-windows-msvc
+    if ($hasWinget) {
+        # winget checks the installer against the hash in its manifest.
+        Write-Step "Installing Rust via winget (Rustlang.Rustup)..."
+        winget install --id Rustlang.Rustup -e --silent --accept-source-agreements --accept-package-agreements
+        & "$env:USERPROFILE\.cargo\bin\rustup.exe" default stable-x86_64-pc-windows-msvc
+    } else {
+        Write-Step "Installing Rust via rustup-init (SHA-256 verified)..."
+        $rustupUrl  = "https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe"
+        $rustupPath = "$env:TEMP\rustup-init.exe"
+        Invoke-WebRequest -Uri $rustupUrl -OutFile $rustupPath
+        $expected = (Invoke-WebRequest -Uri "$rustupUrl.sha256" -UseBasicParsing).Content
+        Assert-Sha256 $rustupPath $expected
+        & $rustupPath -y --default-toolchain stable --default-host x86_64-pc-windows-msvc
+    }
     # Add Rust to PATH for this session
     $env:PATH += ";$env:USERPROFILE\.cargo\bin"
     Write-Ok "Rust installed"
@@ -101,6 +127,7 @@ if (Test-Path $wv2Key) {
         $wv2Url = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
         $wv2Path = "$env:TEMP\MicrosoftEdgeWebview2Setup.exe"
         Invoke-WebRequest -Uri $wv2Url -OutFile $wv2Path
+        Assert-MicrosoftSigned $wv2Path
         Start-Process -FilePath $wv2Path -ArgumentList "/silent /install" -Wait
         Write-Ok "WebView2 Runtime installed"
     }

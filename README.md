@@ -18,8 +18,20 @@
 - Fit to width/page, rotation, two-page reading and memory-bounded continuous PDF scrolling.
 - Reflowable EPUB chapters with adjustable fonts and spacing.
 - Search with visible matches, bookmarks, thumbnails and contents.
+- Offline dictionary (WordNet) for any selected word.
+- All-notes view across the library with tags, colour filters and Anki flashcard export.
+- Annotated PDF copies with highlights and notes written in as standard PDF annotations.
+- Continuous read aloud with a sleep timer; warm light with an evening schedule; time-left estimates.
+- Windows: "Open with" integration, single window, folder sync (e.g. OneDrive) and new-version notices.
+- Clickable PDF links (contents jumps in place; web links ask before opening) and fillable PDF forms with a saved filled copy.
+- Printing through the system print dialog (phones: share sheet → Print).
+- EPUB: the book's own contents (nested sections), right-to-left and fixed-layout books, and optional publisher styles, sanitised.
+- One-file backup and restore, automatic note snapshots, undo after deleting a note, and a crash screen with a local error log.
+- Sync on phones through the same sync file (open it from OneDrive/Drive/iCloud, save the merged copy back); bookmarks sync too.
+- Android and iOS: open PDFs and EPUBs from other apps ("Open with" / "Open in").
+- OCR in 22 more languages, downloaded on request and checked against pinned SHA-256 hashes.
 
-Read [release details and platform validation](docs/RELEASE-0.5.md) for supported formats, OCR/speech behaviour, local-storage limits and native build instructions. Windows, Android and iOS are the priority targets; Linux releases are deferred.
+Read the [0.7 release notes](docs/RELEASE-0.7.md), [0.6 release details](docs/RELEASE-0.6.md) and the [0.5 platform validation notes](docs/RELEASE-0.5.md) for supported formats, OCR/speech behaviour, local-storage limits and native build instructions. Windows, Android and iOS are the priority targets; Linux releases are deferred.
 
 ---
 
@@ -32,13 +44,6 @@ Read [release details and platform validation](docs/RELEASE-0.5.md) for supporte
 | iOS | Capacitor | Unsigned simulator app; device distribution requires Apple signing |
 
 Native device acceptance remains required before a production release.
-
-----------|----------------|-----------------------------------|
-| Windows  | Tauri + React  | `.msi` / `.exe` via GitHub Releases |
-| Linux    | Tauri + React  | `.deb` / `.AppImage` / Flathub    |
-| macOS    | Tauri + React  | `.dmg` via GitHub Releases        |
-| Android  | Capacitor      | `.apk` via GitHub Releases / F-Droid |
-| iOS      | Capacitor      | `.ipa` sideload / AltStore        |
 
 ---
 
@@ -172,12 +177,19 @@ nightreader/
 |---|---|
 | `← / →` | Previous / Next page |
 | `PageUp / PageDown` | Previous / Next page |
-| `Space` | Next page |
+| `↑ / ↓` | Scroll; at the edge, previous / next page |
+| `Space` | Scroll down a screen; at the bottom, next page |
+| Mouse wheel | Scroll; one more notch at the edge turns the page |
+| `Ctrl + mouse wheel` | Zoom a PDF / resize EPUB text |
+| Swipe left / right (touch) | Next / previous page |
+| Pinch (touch) | Zoom a PDF / resize EPUB text |
 | `+ / −` | Zoom in / out |
 | `Ctrl + 0` | Reset zoom |
 | `Ctrl + F` | Find in document |
+| `Ctrl + P` | Print |
 | `R` | Toggle focus mode |
-| `Esc` | Close search / exit focus mode |
+| `Esc` | Close search or a dialog |
+| `?` | Show all shortcuts in the app |
 
 ---
 
@@ -230,4 +242,7 @@ All forks and derivatives must also be open source under the same licence.
 - [Tauri](https://tauri.app) — lightweight Rust-based desktop shell
 - [Capacitor](https://capacitorjs.com) — Ionic's native mobile bridge
 - [Zustand](https://github.com/pmndrs/zustand) — minimal React state management
+- [WordNet](https://wordnet.princeton.edu) — offline dictionary data, © 2006 Princeton University, used under the WordNet licence
+- [pdf-lib](https://pdf-lib.js.org) — writing annotations into PDF copies
+- [Tesseract.js](https://tesseract.projectnaptha.com) — offline text recognition
 - Inspired by [Readera](https://readera.org) and [Foxit Reader](https://www.foxit.com)
