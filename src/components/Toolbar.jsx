@@ -131,47 +131,79 @@ export default function Toolbar({ onFileLoaded, onPrint }) {
           A+
         </button>
 
-        <button
-          className={styles.btn}
-          onClick={() => setZoom(1.0)}
-          title="Reset to 100%"
-          aria-label="Reset zoom"
-          style={{ fontSize: "10px", padding: "4px 6px" }}
-        >
-          100%
-        </button>
         <select className={styles.zoomSelect} aria-label="Page fit" value={fit} onChange={e => setFit(e.target.value)}><option value="width">Fit to width</option><option value="page">Fit to page</option><option value="manual">Custom zoom</option></select>
-        <button className={styles.btn} onClick={rotate}>Rotate</button>
-        <button className={styles.btn} onClick={toggleSpread} aria-pressed={spread}>Two pages</button>
       </div>}
 
       <div className={styles.sep} />
 
-      {/* Tools */}
+      {/* Tools used while reading */}
       <div className={styles.group}>
         <button className={`${styles.btn} ${searchVisible ? styles.active : ""}`} onClick={toggleSearch} title="Find (Ctrl+F)">🔍 Find</button>
         <button className={`${styles.btn} ${annotMode ? styles.active : ""}`} onClick={toggleAnnotMode} title="Annotate">✏ Annotate</button>
         <button className={styles.btn} onClick={handleBookmark} title="Bookmark current page">🔖 Mark</button>
         {!epub && <InkControls />}
-      </div>
-
-      <div className={styles.sep} />
-
-      {/* View */}
-      <div className={styles.group}>
-        {!epub && <button className={`${styles.btn} ${scrollMode ? styles.active : ""}`} onClick={toggleScrollMode} title="Continuous scroll">☰ Scroll</button>}
         <button className={`${styles.btn} ${split ? styles.active : ""}`} aria-pressed={!!split} onClick={() => useStore.getState().toggleSplit()} title="Read two documents (or two places in one) side by side">◫ Side by side</button>
-        <button className={styles.btn} onClick={onPrint} title="Print (Ctrl+P)">⎙ Print</button>
-        <button className={`${styles.btn} ${invertColors ? styles.active : ""}`} onClick={toggleInvert} title="Invert colours">◑ Invert</button>
-        <button className={styles.btn} onClick={toggleFocusMode} title="Focus mode (R)">▭ Focus</button>
       </div>
 
       <div className={styles.spacer} />
 
-      <button className={`${styles.btn} ${styles.openBtn}`} onClick={handleOpen}>Open document</button>
+      {/* Less-used view options live in one menu, so the bar fits a 1366-pixel-wide screen. */}
+      <MoreMenu items={[
+        ...(!epub ? [
+          { label: "Reset zoom to 100%", hint: "Ctrl+0", onSelect: () => setZoom(1.0) },
+          { label: "Rotate", onSelect: rotate },
+          { label: "Two pages", checked: spread, onSelect: toggleSpread },
+          { label: "Continuous scroll", checked: scrollMode, onSelect: toggleScrollMode },
+        ] : []),
+        { label: "Invert colours", checked: invertColors, onSelect: toggleInvert },
+        { label: "Focus mode", hint: "R", onSelect: toggleFocusMode },
+        { label: "Print…", hint: "Ctrl+P", onSelect: onPrint },
+        { label: "Open document…", onSelect: handleOpen },
+      ]} />
     </div>
   );
 }
+
+/**
+ * A small menu button (WAI-ARIA menu pattern): arrow keys move between items,
+ * Escape or a click outside closes it, and focus returns to the button.
+ */
+function MoreMenu({ items }) {
+  const [open, setOpen] = React.useState(false);
+  const button = React.useRef(null), menu = React.useRef(null);
+  React.useEffect(() => {
+    if (!open) return;
+    menu.current?.querySelector("[role^=menuitem]")?.focus();
+    const close = e => { if (!menu.current?.contains(e.target) && !button.current?.contains(e.target)) setOpen(false); };
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [open]);
+  function onKey(e) {
+    const list = [...menu.current.querySelectorAll("[role^=menuitem]")], i = list.indexOf(document.activeElement);
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); list[(i + (e.key === "ArrowDown" ? 1 : -1) + list.length) % list.length]?.focus(); }
+    else if (e.key === "Home") { e.preventDefault(); list[0]?.focus(); }
+    else if (e.key === "End") { e.preventDefault(); list.at(-1)?.focus(); }
+    else if (e.key === "Escape" || e.key === "Tab") { e.stopPropagation(); setOpen(false); if (e.key === "Escape") button.current?.focus(); }
+  }
+  return (
+    <div style={{ position: "relative" }}>
+      <button ref={button} className={`${styles.btn} ${open ? styles.active : ""}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(o => !o)} title="More view options">More ▾</button>
+      {open && (
+        <div ref={menu} role="menu" aria-label="More view options" onKeyDown={onKey} className={styles.menu}>
+          {items.map(item => (
+            <button key={item.label} role={item.checked === undefined ? "menuitem" : "menuitemcheckbox"} aria-checked={item.checked === undefined ? undefined : !!item.checked}
+              tabIndex={-1} className={styles.menuItem} onClick={() => { setOpen(false); item.onSelect?.(); }}>
+              <span aria-hidden="true" style={{ width: 14, display: "inline-block" }}>{item.checked ? "✓" : ""}</span>
+              <span style={{ flex: 1 }}>{item.label}</span>
+              {item.hint && <span className={styles.menuHint}>{item.hint}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 /** Pen tool: draw with a mouse or pen, choose colour and thickness, erase, undo. */
 function InkControls() {
@@ -182,7 +214,7 @@ function InkControls() {
     {tool && <span role="group" aria-label="Ink options" style={{ display: "flex", alignItems: "center", gap: 4 }}>
       {INK_COLORS.map(([value, name]) => <button key={value} aria-label={`Ink ${name.toLowerCase()}`} aria-pressed={color === value && tool === "pen"} onClick={() => { setInk({ inkColor: value }); if (tool !== "pen") setInkTool("pen"); }}
         style={{ width: 22, height: 22, borderRadius: 11, background: value, border: color === value ? "2px solid var(--accent)" : "1px solid var(--border)", padding: 0 }} />)}
-      <select aria-label="Ink thickness" value={width} onChange={e => setInk({ inkWidth: Number(e.target.value) })} style={{ fontSize: 11 }}>
+      <select aria-label="Ink thickness" className={styles.zoomSelect} value={width} onChange={e => setInk({ inkWidth: Number(e.target.value) })}>
         {INK_WIDTHS.map(([value, name]) => <option key={value} value={value}>{name}</option>)}
       </select>
       <button className={`${styles.btn} ${tool === "eraser" ? styles.active : ""}`} aria-pressed={tool === "eraser"} onClick={() => setInkTool("eraser")} title="Erase strokes (or turn the Surface Pen over)">⌫ Eraser</button>

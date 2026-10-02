@@ -350,3 +350,30 @@ test('reading statistics count active reading time and pages', async ({ page }) 
   await expect(stats.getByRole('table').last()).toContainText('reading.pdf');
   await expect(stats.getByRole('group', { name: /minutes read per day/ })).toBeVisible();
 });
+
+test('the More menu works from the keyboard and the toolbar fits on one row at Surface Pro 4 size', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'Desktop layout');
+  await page.setViewportSize({ width: 1368, height: 912 });
+  await openPdf(page);
+  const toolbar = page.getByRole('toolbar', { name: 'Reader controls' });
+  const oneRow = async () => (await toolbar.boundingBox()).height < 50;
+  expect(await oneRow()).toBe(true);
+  await page.getByRole('button', { name: '✒ Ink' }).click(); // ink options open
+  expect(await oneRow()).toBe(true);
+  await page.getByRole('button', { name: '✒ Ink' }).click();
+  const more = page.getByRole('button', { name: 'More ▾' });
+  await more.focus();
+  await page.keyboard.press('Enter');
+  const menu = page.getByRole('menu', { name: 'More view options' });
+  await expect(menu.getByRole('menuitem', { name: /Reset zoom/ })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(menu.getByRole('menuitem', { name: 'Rotate' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await expect(more).toBeFocused();
+  await more.click();
+  await menu.getByRole('menuitemcheckbox', { name: /Two pages/ }).click();
+  await expect(page.locator('[data-page]')).toHaveCount(2);
+  await more.click();
+  await expect(menu.getByRole('menuitemcheckbox', { name: /Two pages/ })).toHaveAttribute('aria-checked', 'true');
+});
