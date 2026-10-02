@@ -8,7 +8,10 @@ on:
 permissions:
   contents: read
 jobs:
+  # Pull requests: a debug build to try out, plus a check that release signing works,
+  # using a throwaway key made inside the run (the real key is never used here).
   android:
+    if: github.ref_type != 'tag'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -34,3 +37,96 @@ jobs:
           name: nightreader-android-review
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+      - name: Check release signing with a throwaway key
+        working-directory: android
+        run: |
+          set -euo pipefail
+          export NR_KEYSTORE_FILE="$RUNNER_TEMP/selftest.p12" NR_KEY_ALIAS=selftest NR_KEYSTORE_PASSWORD="$(openssl rand -hex 16)"
+          keytool -genkeypair -storetype PKCS12 -keystore "$NR_KEYSTORE_FILE" -alias selftest -keyalg RSA -keysize 2048 -validity 1 \
+            -storepass "$NR_KEYSTORE_PASSWORD" -dname "CN=NightReader CI self-test"
+          ./gradlew assembleRelease
+          APKSIGNER="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner"
+          CERTS="$("$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk)"
+          echo "$CERTS"
+          grep -q "CN=NightReader CI self-test" <<< "$CERTS"
+          rm -f "$NR_KEYSTORE_FILE"
+
+  # Version tags: a signed release APK (to install directly) and AAB (for Google Play),
+  # attached to the GitHub release. Needs the ANDROID_KEYSTORE_BASE64,
+  # ANDROID_KEYSTORE_PASSWORD and ANDROID_KEY_ALIAS repository secrets.
+  release:
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: '22'
+          # No dependency caches in release builds: a poisoned cache must never reach a published app.
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+      - name: Check the signing secrets are set
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          if [ -z "$KEYSTORE" ] || [ -z "$PASSWORD" ] || [ -z "$ALIAS" ]; then
+            echo "::error::Android signing secrets are missing. Add ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD and ANDROID_KEY_ALIAS (see docs/ANDROID-SIGNING.md), then re-run this job."
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm run build
+      - run: npx cap sync android
+      - run: chmod +x android/gradlew
+      - name: Build signed APK and AAB
+        working-directory: android
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          NR_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          NR_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          export NR_KEYSTORE_FILE="$RUNNER_TEMP/release.p12"
+          umask 077
+          printf '%s' "$KEYSTORE" | base64 -d > "$NR_KEYSTORE_FILE"
+          ./gradlew assembleRelease bundleRelease
+      - name: Verify the signature and record the certificate
+        working-directory: android
+        run: |
+          set -euo pipefail
+          APKSIGNER="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner"
+          CERTS="$("$APKSIGNER" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk)"
+          echo "$CERTS"
+          if grep -q "CN=Android Debug" <<< "$CERTS"; then echo "::error::The release APK is signed with a debug key."; exit 1; fi
+          VERSION="$(node -p "require('../package.json').version")"
+          mkdir -p ../dist-android
+          cp app/build/outputs/apk/release/app-release.apk "../dist-android/NightReader_${VERSION}_android.apk"
+          cp app/build/outputs/bundle/release/app-release.aab "../dist-android/NightReader_${VERSION}_android.aab"
+          {
+            echo "### Android ${VERSION} signing certificate"
+            echo '```'
+            grep -E "certificate (DN|SHA-256 digest)" <<< "$CERTS"
+            echo '```'
+            echo "Compare the SHA-256 digest with the one in docs/ANDROID-SIGNING.md: it must never change between versions."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Remove the keystore from the runner
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.p12"
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: nightreader-android-release
+          path: dist-android/*
+          if-no-files-found: error
+      # The APK is for installing directly; the AAB is only for Google Play, so it stays a build artifact.
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          draft: true
+          files: dist-android/*.apk

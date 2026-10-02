@@ -201,16 +201,14 @@ nightreader/
 
 ## Releasing a new version
 
-1. Bump the version in `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`
-2. Commit and push to `main`
-3. Create and push a version tag:
+1. Bump the version in `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, `android/app/build.gradle` (`versionCode` and `versionName`) and the iOS project.
+2. Merge to `main`.
+3. On GitHub, **Releases → Draft a new release**, type the new tag (for example `v0.9.0`), choose *Create new tag on publish*, add the notes and publish.
 
-```bash
-git tag v0.2.0
-git push origin v0.2.0
-```
-
-GitHub Actions validates the frontend and builds Windows installers, an Android debug APK and an unsigned iOS simulator app. These are review artifacts. Production Android/iOS distribution requires signing and platform-specific checks; see the release guide above.
+Publishing the tag starts the release builds:
+- **Windows:** the `.exe` and `.msi` installers are attached to the release.
+- **Android:** a signed `NightReader_<version>_android.apk` is attached. The Google Play `.aab` is kept as a build artifact. This needs the signing secrets described in [docs/ANDROID-SIGNING.md](docs/ANDROID-SIGNING.md).
+- **iOS:** an unsigned simulator build. Distributing to iPhones needs an Apple Developer Program membership.
 
 ---
 

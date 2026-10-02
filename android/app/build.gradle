@@ -1,5 +1,19 @@
 apply plugin: 'com.android.application'
 
+// Release signing. The key never lives in the repository:
+// - CI: the release workflow writes the keystore from a GitHub secret to a temporary
+//   file and passes NR_KEYSTORE_FILE, NR_KEYSTORE_PASSWORD and NR_KEY_ALIAS.
+// - Your own PC: put the same three values in android/keystore.properties
+//   (storeFile=..., storePassword=..., keyAlias=...); that file is git-ignored.
+// Without either, release builds are left unsigned and debug builds are unaffected.
+def signingProps = new Properties()
+def signingFile = rootProject.file('keystore.properties')
+if (signingFile.exists()) signingFile.withInputStream { signingProps.load(it) }
+def releaseStore = System.getenv('NR_KEYSTORE_FILE') ?: signingProps['storeFile']
+def releasePassword = System.getenv('NR_KEYSTORE_PASSWORD') ?: signingProps['storePassword']
+def releaseAlias = System.getenv('NR_KEY_ALIAS') ?: signingProps['keyAlias']
+def canSign = releaseStore && releasePassword && releaseAlias
+
 android {
     namespace = "com.nightreader.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,8 +30,20 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (canSign) {
+                storeFile file(releaseStore)
+                storePassword releasePassword
+                keyAlias releaseAlias
+                // PKCS12 keystores (the keytool default) use one password for the store and the key.
+                keyPassword System.getenv('NR_KEY_PASSWORD') ?: signingProps['keyPassword'] ?: releasePassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (canSign) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
