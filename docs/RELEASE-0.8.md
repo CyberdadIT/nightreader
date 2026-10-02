@@ -107,7 +107,7 @@ Less-used view options (reset zoom, rotate, two pages, continuous scroll, invert
   - library search with accents
   - the app lock: wrong passphrase, passphrase change, sealing with fresh IVs, tamper detection, no writes while locked, large state, encrypted backups, truncated backups
 - **Rust tests:** 8 passed. New: voice ID allowlist, word-progress parsing, voice list parsing.
-- **Browser tests** (Chromium, desktop and Android layouts, production build under CSP): 83 passed, 7 skipped (pen, mouse ink and side by side on the phone layout). New:
+- **Browser tests** (Chromium, desktop and Android layouts, production build under CSP): 84 passed, 8 skipped (pen, mouse ink, side by side and the toolbar-width check on the phone layout). New:
   - pen writing, erasing, undo and the `/Ink` export
   - mouse ink
   - read along with male and female voices, and preview
