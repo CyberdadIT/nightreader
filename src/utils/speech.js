@@ -30,8 +30,19 @@ export function sortVoices(voices) {
   return [...voices].sort((a,b)=>rank(a)-rank(b)||(a.lang||'').localeCompare(b.lang||'')||String(a.name).localeCompare(String(b.name)));
 }
 
+// Which engine speaks in the desktop app: the native one (Windows SAPI, Linux
+// speech-dispatcher/eSpeak NG), or the web view's own if there is no native engine.
+let desktopEngine='native';
 export async function speechVoices() {
-  if(isTauri()){const {invoke}=await import("@tauri-apps/api/core");return invoke("get_speech_voices");}
+  if(isTauri()){
+    const {invoke}=await import("@tauri-apps/api/core");
+    try { desktopEngine='native'; return await invoke("get_speech_voices",{lang:navigator.language||'en'}); }
+    catch(e){
+      const web=window.speechSynthesis?.getVoices()||[];
+      if(web.length){desktopEngine='web';return web;}
+      throw e;
+    }
+  }
   if(isCapacitor()){
     const {TextToSpeech}=await import('@capacitor-community/text-to-speech');
     // The plugin selects a voice by its index in this list, so the index is kept as the id.
@@ -40,7 +51,7 @@ export async function speechVoices() {
   return window.speechSynthesis?.getVoices()||[];
 }
 export async function stopSpeech() {
-  if(isTauri()){const {invoke}=await import("@tauri-apps/api/core");await invoke("stop_speech");return;}
+  if(isTauri()&&desktopEngine==='native'){const {invoke}=await import("@tauri-apps/api/core");await invoke("stop_speech");return;}
   if(isCapacitor()){const {TextToSpeech}=await import('@capacitor-community/text-to-speech');await TextToSpeech.stop();}
   else window.speechSynthesis?.cancel();
 }
@@ -58,11 +69,11 @@ export function wordLengthAt(text,index) {
  */
 export async function speakChunk(text,rate,voiceURI,voices,onWord) {
   const voice=voices.find(v=>v.voiceURI===voiceURI);
-  if(isTauri()){
+  if(isTauri()&&desktopEngine==='native'){
     const {invoke}=await import("@tauri-apps/api/core");
     let unlisten=null;
     if(onWord){const {listen}=await import("@tauri-apps/api/event");unlisten=await listen('speech-word',e=>onWord(e.payload.pos,e.payload.len));}
-    try { await invoke("speak_text",{text,rate,voice:voice?voiceURI:''}); }
+    try { await invoke("speak_text",{text,rate,voice:voice?voiceURI:'',lang:voice?.lang||navigator.language||'en'}); }
     finally { unlisten?.(); }
     return;
   }

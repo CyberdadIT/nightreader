@@ -1,4 +1,7 @@
 :root {
+  /* The interface is dark: native form controls (menus, checkboxes, scroll bars) follow
+     suit. WebKitGTK on Linux otherwise draws light menus with the app's light text. */
+  color-scheme: dark;
   --font-serif: 'Crimson Pro', Georgia, serif;
   --font-sans:  'Sora', system-ui, sans-serif;
   --font-mono:  'JetBrains Mono', 'Fira Code', monospace;
@@ -31,6 +34,7 @@
 
 @layer nr-reset {
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  select, option { background-color: var(--panel); color: var(--text); }
 }
 
 html, body, #root {

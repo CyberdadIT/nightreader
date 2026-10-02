@@ -1,0 +1,43 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "targets": [
+      "deb",
+      "rpm",
+      "appimage"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/256x256.png",
+      "icons/icon.png"
+    ],
+    "linux": {
+      "deb": {
+        "section": "text",
+        "recommends": [
+          "speech-dispatcher",
+          "espeak-ng"
+        ],
+        "desktopTemplate": "linux/nightreader.desktop",
+        "depends": [
+          "libc6 (>= 2.39)"
+        ]
+      },
+      "rpm": {
+        "recommends": [
+          "speech-dispatcher",
+          "espeak-ng"
+        ],
+        "desktopTemplate": "linux/nightreader.desktop",
+        "depends": [
+          "glibc >= 2.39"
+        ]
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    },
+    "longDescription": "NightReader is an offline reader for PDF and EPUB documents with dark reading modes, warm light, highlights and notes, read aloud, text recognition for scanned PDFs, flashcards and an optional encrypted app lock. Your documents and notes stay on your computer."
+  }
+}

@@ -1,6 +1,7 @@
 mod desktop;
 mod security;
 mod speech;
+mod speech_linux;
 
 pub fn run() {
     let builder = tauri::Builder::default();
