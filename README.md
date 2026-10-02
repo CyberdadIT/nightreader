@@ -36,7 +36,7 @@
 - Search inside every document in the library; flashcard review with spaced repetition; reading statistics.
 - App lock with AES-256 encryption of everything stored on the device; password-protected backups.
 
-Read the [0.8 release notes](docs/RELEASE-0.8.md), [0.7 release notes](docs/RELEASE-0.7.md), [0.6 release details](docs/RELEASE-0.6.md) and the [0.5 platform validation notes](docs/RELEASE-0.5.md) for supported formats, OCR/speech behaviour, local-storage limits and native build instructions. Windows, Android and iOS are the priority targets; Linux releases are deferred.
+Read the [0.8 release notes](docs/RELEASE-0.8.md), [0.7 release notes](docs/RELEASE-0.7.md), [0.6 release details](docs/RELEASE-0.6.md) and the [0.5 platform validation notes](docs/RELEASE-0.5.md) for supported formats, OCR/speech behaviour, local-storage limits and native build instructions. Windows, Linux, Android and iOS are supported; see [README-LINUX.md](README-LINUX.md) for Linux.
 
 ---
 
@@ -45,7 +45,8 @@ Read the [0.8 release notes](docs/RELEASE-0.8.md), [0.7 release notes](docs/RELE
 | Platform | Technology | Review build |
 |---|---|---|
 | Windows | Tauri + React | MSI / EXE |
-| Android | Capacitor | Debug APK |
+| Linux | Tauri + React (WebKitGTK) | .deb / .rpm / AppImage (glibc 2.39+; see [README-LINUX.md](README-LINUX.md)) |
+| Android | Capacitor | Signed APK (release) / debug APK (pull requests) |
 | iOS | Capacitor | Unsigned simulator app; device distribution requires Apple signing |
 
 Native device acceptance remains required before a production release.
@@ -207,6 +208,7 @@ nightreader/
 
 Publishing the tag starts the release builds:
 - **Windows:** the `.exe` and `.msi` installers are attached to the release.
+- **Linux:** the `.deb`, `.rpm` and AppImage, with SHA-256 checksums, are attached to the release.
 - **Android:** a signed `NightReader_<version>_android.apk` is attached. The Google Play `.aab` is kept as a build artifact. This needs the signing secrets described in [docs/ANDROID-SIGNING.md](docs/ANDROID-SIGNING.md).
 - **iOS:** an unsigned simulator build. Distributing to iPhones needs an Apple Developer Program membership.
 

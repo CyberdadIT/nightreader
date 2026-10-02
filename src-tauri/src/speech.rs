@@ -1,4 +1,4 @@
-// Windows speech through SAPI 5 (COM), driven by the built-in Windows PowerShell host.
+// Windows speech through SAPI 5 (COM) (Linux: see speech_linux.rs), driven by the built-in Windows PowerShell host.
 //
 // System.Speech only sees the old "desktop" voices, which on many Windows 10/11
 // installs is a single voice (for example Hazel, female, on UK English systems).
@@ -26,17 +26,20 @@ pub struct Voice {
     gender: String,
 }
 
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 #[derive(Serialize, Clone, Debug, PartialEq)]
 pub struct WordMark {
     pub pos: u32,
     pub len: u32,
 }
 
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 const VOICE_ROOTS: [&str; 2] = [
     r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech_OneCore\Voices\Tokens\",
     r"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\",
 ];
 
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 /// A voice id must be one of the installed voice tokens: a registry path under one of
 /// the two voice roots, with an ordinary token name. Anything else is refused.
 pub fn valid_voice_id(id: &str) -> bool {
@@ -51,6 +54,7 @@ pub fn valid_voice_id(id: &str) -> bool {
     })
 }
 
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 /// Parse one "W <pos> <len>" progress line from the speech script.
 pub fn parse_word_line(line: &str) -> Option<WordMark> {
     let mut parts = line.trim().split(' ');
@@ -112,9 +116,11 @@ while(-not $v.WaitUntilDone(40)){
 "#;
 
 #[tauri::command]
-pub async fn get_speech_voices() -> Result<Vec<Voice>, String> {
+#[allow(clippy::needless_return)] // one return per platform block
+pub async fn get_speech_voices(lang: Option<String>) -> Result<Vec<Voice>, String> {
     #[cfg(target_os = "windows")]
     {
+        let _ = lang;
         let output = tauri::async_runtime::spawn_blocking(|| powershell(VOICES_SCRIPT).output())
             .await
             .map_err(|e| e.to_string())?
@@ -124,10 +130,20 @@ pub async fn get_speech_voices() -> Result<Vec<Voice>, String> {
         }
         return parse_voices(&output.stdout);
     }
-    #[cfg(not(target_os = "windows"))]
-    Err("Native speech is currently supported on Windows only".into())
+    #[cfg(target_os = "linux")]
+    {
+        let lang = lang.unwrap_or_else(|| "en".into());
+        let found = tauri::async_runtime::spawn_blocking(move || crate::speech_linux::voices(&lang)).await.map_err(|e| e.to_string())??;
+        return Ok(found.into_iter().map(|v| Voice { name: v.name, lang: v.lang, uri: v.uri, local: v.local, gender: v.gender }).collect());
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    {
+        let _ = lang;
+        Err("Native speech isn't available on this system".into())
+    }
 }
 
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
 /// Turn the voice script's JSON into voices, keeping only well-formed, valid entries.
 pub fn parse_voices(json: &[u8]) -> Result<Vec<Voice>, String> {
     let value: serde_json::Value = serde_json::from_slice(json).map_err(|e| e.to_string())?;
@@ -159,18 +175,52 @@ pub fn parse_voices(json: &[u8]) -> Result<Vec<Voice>, String> {
         .collect())
 }
 
+/// Wait for a speech process, unless another one replaces it or it's stopped.
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+async fn track(state: &SpeechState, child: std::process::Child, failure: &'static str) -> Result<(), String> {
+    let process_id = child.id();
+    let shared = state.0.clone();
+    {
+        let mut slot = shared.lock().map_err(|e| e.to_string())?;
+        if let Some(mut old) = slot.take() {
+            let _ = old.kill();
+            let _ = old.wait();
+        }
+        *slot = Some(child);
+    }
+    tauri::async_runtime::spawn_blocking(move || loop {
+        {
+            let mut slot = shared.lock().map_err(|e| e.to_string())?;
+            match slot.as_mut() {
+                Some(child) if child.id() == process_id => {
+                    if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
+                        slot.take();
+                        return if status.success() { Ok(()) } else { Err(failure.to_string()) };
+                    }
+                }
+                _ => return Ok(()),
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_millis(40));
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
-pub async fn speak_text(app: tauri::AppHandle, state: tauri::State<'_, SpeechState>, text: String, rate: f64, voice: String) -> Result<(), String> {
-    if !valid_voice_id(&voice) {
-        return Err("Unknown voice".into());
+#[allow(clippy::needless_return)] // one return per platform block
+pub async fn speak_text(app: tauri::AppHandle, state: tauri::State<'_, SpeechState>, text: String, rate: f64, voice: String, lang: Option<String>) -> Result<(), String> {
+    if text.len() > 4096 {
+        return Err("Speech chunk is too long".into());
     }
     #[cfg(target_os = "windows")]
     {
         use std::io::{BufRead, BufReader, Write};
         use std::process::Stdio;
         use tauri::Emitter;
-        if text.len() > 4096 {
-            return Err("Speech chunk is too long".into());
+        let _ = lang;
+        if !valid_voice_id(&voice) {
+            return Err("Unknown voice".into());
         }
         // NightReader's 0.5×–2× maps onto SAPI's −10…10 scale (0 = normal).
         let sapi_rate = ((rate.clamp(0.5, 2.0) - 1.0) * 5.0).round() as i32;
@@ -182,7 +232,6 @@ pub async fn speak_text(app: tauri::AppHandle, state: tauri::State<'_, SpeechSta
             .stderr(Stdio::null())
             .spawn()
             .map_err(|e| e.to_string())?;
-        let process_id = child.id();
         child.stdin.take().ok_or("Speech input is unavailable")?.write_all(text.as_bytes()).map_err(|e| e.to_string())?;
         if let Some(stdout) = child.stdout.take() {
             std::thread::spawn(move || {
@@ -193,37 +242,31 @@ pub async fn speak_text(app: tauri::AppHandle, state: tauri::State<'_, SpeechSta
                 }
             });
         }
-        let shared = state.inner().0.clone();
-        {
-            let mut slot = shared.lock().map_err(|e| e.to_string())?;
-            if let Some(mut old) = slot.take() {
-                let _ = old.kill();
-                let _ = old.wait();
-            }
-            *slot = Some(child);
-        }
-        return tauri::async_runtime::spawn_blocking(move || loop {
-            {
-                let mut slot = shared.lock().map_err(|e| e.to_string())?;
-                match slot.as_mut() {
-                    Some(child) if child.id() == process_id => {
-                        if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
-                            slot.take();
-                            return if status.success() { Ok(()) } else { Err("Windows speech failed. Try another voice.".into()) };
-                        }
-                    }
-                    _ => return Ok(()),
-                }
-            }
-            std::thread::sleep(std::time::Duration::from_millis(40));
-        })
-        .await
-        .map_err(|e| e.to_string())?;
+        return track(state.inner(), child, "Windows speech failed. Try another voice.").await;
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
     {
-        let _ = (app, state, text, rate);
-        Err("Native speech is currently supported on Windows only".into())
+        use std::io::Write;
+        use std::process::Stdio;
+        let _ = app;
+        if !crate::speech_linux::valid_voice_id(&voice) {
+            return Err("Unknown voice".into());
+        }
+        let lang = lang.unwrap_or_else(|| "en".into());
+        let mut command = crate::speech_linux::speak_command(&voice, rate, &lang)
+            .ok_or("No text-to-speech engine was found. Install speech-dispatcher or espeak-ng (for example: sudo apt install speech-dispatcher espeak-ng).")?;
+        let mut child = command.stdin(Stdio::piped()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().map_err(|e| e.to_string())?;
+        {
+            // Closing stdin (dropping it) tells the engine the text is complete.
+            let mut input = child.stdin.take().ok_or("Speech input is unavailable")?;
+            input.write_all(text.as_bytes()).map_err(|e| e.to_string())?;
+        }
+        return track(state.inner(), child, "Speech failed. Try another voice.").await;
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    {
+        let _ = (app, state, text, rate, voice, lang);
+        Err("Native speech isn't available on this system".into())
     }
 }
 
@@ -234,6 +277,9 @@ pub fn stop_speech(state: tauri::State<'_, SpeechState>) -> Result<(), String> {
         child.kill().map_err(|e| e.to_string())?;
         let _ = child.wait();
     }
+    drop(slot);
+    #[cfg(target_os = "linux")]
+    crate::speech_linux::cancel();
     Ok(())
 }
 

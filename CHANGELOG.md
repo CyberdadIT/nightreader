@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- **Linux desktop app.** .deb (Ubuntu, Debian, Mint), .rpm (Fedora) and AppImage packages, built for every release. It opens PDFs and EPUBs from the file manager. Read aloud uses speech-dispatcher or eSpeak NG, with male and female voices. Each pull request runs a WebDriver smoke test of the real Linux app, covering command-line open, PDF rendering, OCR under the CSP, WebCrypto for the app lock, voices and EPUB. See README-LINUX.md.
+- **Dark form controls.** Menus and checkboxes now follow the dark interface. On Linux, drop-down menus were light with unreadable text.
 - Android release builds are now signed with your own key (kept in GitHub secrets) and the APK is attached to each GitHub release. Pull requests check the signing setup with a throwaway key. See docs/ANDROID-SIGNING.md.
 
 ## [0.8.0] — pen, read along, study and privacy
