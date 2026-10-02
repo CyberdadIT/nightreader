@@ -67,7 +67,9 @@ export default function SettingsPanel({ doc, onClose }) {
     return () => { cancelled = true; };
   }, [doc]);
 
-  const fileAnnotations = annotations.filter((a) => a.filePath === filePath);
+  // Pen strokes aren't text notes: they're listed as a count and go only into the annotated PDF.
+  const fileInk = annotations.filter((a) => a.filePath === filePath && a.type === "ink");
+  const fileAnnotations = annotations.filter((a) => a.filePath === filePath && a.type !== "ink");
 
   async function exportNotes(format) {
     try {
@@ -83,7 +85,7 @@ export default function SettingsPanel({ doc, onClose }) {
         return;
       }
       if (format === "pdf") {
-        const { written, skipped } = await saveAnnotatedPdf(activeTab, fileAnnotations, doc);
+        const { written, skipped } = await saveAnnotatedPdf(activeTab, [...fileAnnotations, ...fileInk], doc);
         if (written !== null) setExportMessage(`Saved a copy with ${written} annotation${written === 1 ? "" : "s"}${skipped ? `. ${skipped} older note${skipped === 1 ? "" : "s"} without saved positions ${skipped === 1 ? "was" : "were"} left out; re-highlight ${skipped === 1 ? "it" : "them"} to include ${skipped === 1 ? "it" : "them"}` : ""}.`);
         return;
       }
@@ -185,8 +187,8 @@ export default function SettingsPanel({ doc, onClose }) {
 
         {/* Annotations */}
         <section className={styles.annotSection}>
-          <h3 className={styles.sectionTitle}>Annotations ({fileAnnotations.length})</h3>
-          <div className="exportActions"><button disabled={!fileAnnotations.length} onClick={() => exportNotes("md")}>Export Markdown</button><button disabled={!fileAnnotations.length} onClick={() => exportNotes("html")}>Export printable HTML</button><button disabled={!fileAnnotations.length} onClick={() => exportNotes("anki")}>Export flashcards (Anki)</button>{activeTab?.kind !== "epub" && <button disabled={!fileAnnotations.length} onClick={() => exportNotes("pdf")}>Save annotated PDF copy</button>}{hasForm && <button onClick={() => exportNotes("filled")}>Save filled form copy</button>}</div>
+          <h3 className={styles.sectionTitle}>Annotations ({fileAnnotations.length}){fileInk.length > 0 && ` · ${fileInk.length} pen stroke${fileInk.length === 1 ? "" : "s"}`}</h3>
+          <div className="exportActions"><button disabled={!fileAnnotations.length} onClick={() => exportNotes("md")}>Export Markdown</button><button disabled={!fileAnnotations.length} onClick={() => exportNotes("html")}>Export printable HTML</button><button disabled={!fileAnnotations.length} onClick={() => exportNotes("anki")}>Export flashcards (Anki)</button>{activeTab?.kind !== "epub" && <button disabled={!fileAnnotations.length && !fileInk.length} onClick={() => exportNotes("pdf")}>Save annotated PDF copy</button>}{hasForm && <button onClick={() => exportNotes("filled")}>Save filled form copy</button>}</div>
           {exportError && <p role="alert">{exportError}</p>}
           {exportMessage && <p role="status" style={{ fontSize: 12, color: "var(--muted)" }}>{exportMessage}</p>}
           {fileAnnotations.length === 0 ? (

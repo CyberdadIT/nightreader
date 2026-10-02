@@ -192,3 +192,5 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
   #print-root .print-chapter img { max-width: 100%; }
   @page { margin: 12mm; }
 }
+/* Side-by-side reading stacks on narrow screens (phones, portrait tablets). */
+@media (max-width: 760px) { .splitView { flex-direction: column; } }

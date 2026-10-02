@@ -1,26 +1,29 @@
 import React,{useEffect,useRef,useState} from 'react';
 import {useStore} from '../store/useStore.js';
-import {speechVoices,stopSpeech,speakChunk,splitSpeech} from '../utils/speech.js';
+import {speechVoices,stopSpeech,speakChunk,splitSpeech,voiceLabel,sortVoices,VOICE_SAMPLE} from '../utils/speech.js';
+import {alignChunk,compact,wordOnScreen} from '../utils/speechAlign.js';
+import {textRange} from '../utils/annotations.js';
+import {forgetIndex} from '../utils/libraryIndex.js';
 import {createOcrWorker,recognizePage} from '../utils/ocr.js';
 import {ocrLanguage,installedOcrLanguages} from '../utils/ocrLanguages.js';
 import styles from './ReadingTools.module.css';
 export default function ReadingTools({doc}) {
-  const tab=useStore(s=>s.getActiveTab()),rate=useStore(s=>s.speechRate),voice=useStore(s=>s.speechVoice),continuous=useStore(s=>s.speechContinuous);
+  const tab=useStore(s=>s.getActiveTab()),rate=useStore(s=>s.speechRate),voice=useStore(s=>s.speechVoice),continuous=useStore(s=>s.speechContinuous),highlight=useStore(s=>s.speechHighlight);
   const [sleep,setSleep]=useState('off'),[sleepUntil,setSleepUntil]=useState(0);
   const unit=doc.kind==='epub'?'chapter':'page';
   const [voices,setVoices]=useState([]),[state,setState]=useState('idle'),[message,setMessage]=useState('');
   const [ocrBusy,setOcrBusy]=useState(false),[all,setAll]=useState(false);
-  const speech=useRef({token:0,chunks:[],index:0,continuing:false}),worker=useRef(null),cancelOcr=useRef(false),alive=useRef(true), abortOcr=useRef(null);
+  const speech=useRef({token:0,chunks:[],index:0,continuing:false,cursor:0,screenText:null,screen:null}),worker=useRef(null),cancelOcr=useRef(false),alive=useRef(true), abortOcr=useRef(null);
   const speakingPage=tab?.page||1;
   useEffect(()=>{
-    let cancelled=false;const refresh=()=>speechVoices().then(v=>{if(!cancelled)setVoices(v);}).catch(()=>{});
+    let cancelled=false;const refresh=()=>speechVoices().then(v=>{if(!cancelled)setVoices(sortVoices(v));}).catch(()=>{});
     refresh();window.speechSynthesis?.addEventListener('voiceschanged',refresh);
     return()=>{cancelled=true;window.speechSynthesis?.removeEventListener('voiceschanged',refresh);};
   },[]);
   // A page change stops reading, unless read aloud itself moved on to the next page.
   useEffect(()=>{
     if(speech.current.continuing){speech.current.continuing=false;play({auto:true});return;}
-    speech.current.token++;stopSpeech().catch(()=>{});setState('idle');speech.current.chunks=[];
+    speech.current.token++;stopSpeech().catch(()=>{});setState('idle');speech.current.chunks=[];clearMark();
   },[doc,speakingPage]);
   // Sleep timer: stop exactly on time, even mid-sentence.
   useEffect(()=>{
@@ -31,7 +34,7 @@ export default function ReadingTools({doc}) {
   function chooseSleep(value){setSleep(value);setSleepUntil(/^\d+$/.test(value)?Date.now()+Number(value)*60000:0);}
   useEffect(()=>{
     alive.current=true;
-    return()=>{alive.current=false;speech.current.token++;stopSpeech().catch(()=>{});cancelOcr.current=true;abortOcr.current?.();worker.current?.terminate();};
+    return()=>{alive.current=false;speech.current.token++;stopSpeech().catch(()=>{});clearMark();cancelOcr.current=true;abortOcr.current?.();worker.current?.terminate();};
   },[doc]);
   // Move to the next page/chapter and keep reading, if continuous reading allows it.
   function advance(){
@@ -51,11 +54,15 @@ export default function ReadingTools({doc}) {
         speech.current.chunks=splitSpeech(text);speech.current.index=0;
       }
       setState('playing');setMessage('');
+      const page=speakingPage;
       while(speech.current.index<speech.current.chunks.length&&run===speech.current.token){
-        await speakChunk(speech.current.chunks[speech.current.index],rate,voice,voices);
+        const chunk=speech.current.chunks[speech.current.index];
+        const align=markSentence(page,chunk);
+        await speakChunk(chunk,rate,voice,voices,align?(pos,len)=>{if(run===speech.current.token)markWord(page,align,pos,len);}:undefined);
         if(run!==speech.current.token)return;speech.current.index++;
       }
       if(!alive.current||run!==speech.current.token)return;
+      clearMark();
       if(advance())return;
       setState('idle');
       if(sleep==='end'){setSleep('off');setMessage(`Sleep timer: stopped at the end of the ${unit}.`);}
@@ -63,7 +70,40 @@ export default function ReadingTools({doc}) {
     }catch(e){if(alive.current&&run===speech.current.token){setMessage(e.message);setState('idle');}}
   }
   async function pause(){speech.current.token++;speech.current.continuing=false;setState('paused');await stopSpeech().catch(()=>{});}
-  async function stop(){speech.current.token++;speech.current.continuing=false;setState('idle');speech.current.chunks=[];await stopSpeech().catch(()=>{});}
+  async function stop(){speech.current.token++;speech.current.continuing=false;setState('idle');speech.current.chunks=[];clearMark();await stopSpeech().catch(()=>{});}
+  // ── Read-along highlighting ────────────────────────────────────────────
+  function screenRoot(page){return document.querySelector(`[data-viewer-scroll][data-active="true"] [data-text-root][data-page-number="${page}"]`);}
+  function clearMark(){if(useStore.getState().speechMark)useStore.getState().setSpeechMark(null);speech.current.cursor=0;}
+  /** Highlight the sentence about to be spoken; returns its alignment for word marks. */
+  function markSentence(page,chunk){
+    if(!useStore.getState().speechHighlight)return null;
+    const root=screenRoot(page);if(!root)return null;
+    const text=root.textContent||'';
+    if(speech.current.screenText!==text){speech.current.screenText=text;speech.current.screen=compact(text);}
+    const align=alignChunk(speech.current.screen,chunk,speech.current.cursor||0);
+    if(!align){useStore.getState().setSpeechMark(null);return null;}
+    speech.current.cursor=align.end;
+    useStore.getState().setSpeechMark({path:tab?.path,page,start:align.start,end:align.end,word:null});
+    keepVisible(root,align.start,align.end);
+    return align;
+  }
+  function markWord(page,align,pos,len){
+    const word=wordOnScreen(align,pos,len),mark=useStore.getState().speechMark;
+    if(!word||!mark||mark.page!==page)return;
+    useStore.getState().setSpeechMark({...mark,word});
+    const root=screenRoot(page);if(root)keepVisible(root,word.start,word.end);
+  }
+  /** Scroll just enough to keep the spoken text in view. */
+  function keepVisible(root,start,end){
+    const view=root.closest('[data-viewer-scroll]'),range=textRange(root,start,end);if(!view||!range)return;
+    const r=range.getBoundingClientRect(),v=view.getBoundingClientRect();
+    if(!r.height)return;
+    if(r.bottom>v.bottom-40||r.top<v.top+40)view.scrollBy({top:r.top-v.top-v.height/3,behavior:'smooth'});
+  }
+  async function preview(){
+    if(state==='playing')return;
+    try{await stopSpeech().catch(()=>{});await speakChunk(VOICE_SAMPLE,rate,voice,voices);}catch(e){setMessage(e.message);}
+  }
   async function scan(){
     const language=useStore.getState().ocrLanguage||'eng',languageName=ocrLanguage(language)?.name||'English';
     setOcrBusy(true);cancelOcr.current=false;setMessage(`Preparing local ${languageName} OCR…`);
@@ -79,13 +119,16 @@ export default function ReadingTools({doc}) {
         if(result.skipped)skipped++;else done++;
         if(alive.current)useStore.getState().bumpOcrVersion();
       }
+      if(done&&!doc.passwordProtected)forgetIndex(doc.documentId); // re-index with the new text next time the library is searched
       if(alive.current)setMessage(`OCR complete: ${done} scanned pages recognised; ${skipped} pages already had text.`);
     }catch(e){if(alive.current)setMessage(cancelOcr.current?'OCR cancelled. Completed pages are saved.':`OCR failed: ${e.message}`);}
     finally{await worker.current?.terminate().catch(()=>{});worker.current=null;abortOcr.current=null;if(alive.current)setOcrBusy(false);}
   }
   return <section className={styles.tools} aria-label="Read aloud and OCR">
     <div className={styles.row}><button onClick={state==='playing'?pause:play}>{state==='playing'?'Pause':state==='paused'?'Resume':'Read aloud'}</button><button disabled={state==='idle'} onClick={stop}>Stop</button>
-      <label>Voice<select aria-label="Speech voice" value={voice} disabled={state==='playing'} onChange={e=>useStore.getState().setSpeechVoice(e.target.value)}><option value="">Device default</option>{voices.map((v,i)=><option key={`${v.voiceURI}:${i}`} value={v.voiceURI}>{v.name} ({v.lang}){v.localService?'':' · online'}</option>)}</select></label>
+      <label>Voice<select aria-label="Speech voice" value={voices.some(v=>v.voiceURI===voice)?voice:''} disabled={state==='playing'} onChange={e=>useStore.getState().setSpeechVoice(e.target.value)} title={voices.length<=1?'Add more voices in Windows Settings → Time & language → Speech, or in your phone\'s text-to-speech settings':undefined}><option value="">Device default</option>{voices.map((v,i)=><option key={`${v.voiceURI}:${i}`} value={v.voiceURI}>{voiceLabel(v)}</option>)}</select></label>
+      <button onClick={preview} disabled={state==='playing'} aria-label="Preview voice" title="Hear this voice">▶ Preview</button>
+      <label title="Highlight each sentence and word as it is read"><input type="checkbox" checked={highlight} onChange={e=>{useStore.getState().setSpeechHighlight(e.target.checked);if(!e.target.checked)clearMark();}}/> Follow along</label>
       <label title={`Carry on to the next ${unit} automatically`}><input type="checkbox" checked={continuous} onChange={e=>useStore.getState().setSpeechContinuous(e.target.checked)}/> Continuous</label>
       <label>Sleep<select aria-label="Sleep timer" value={sleep} onChange={e=>chooseSleep(e.target.value)}><option value="off">Off</option>{[15,30,45,60,90].map(m=><option key={m} value={m}>{m} min</option>)}<option value="end">End of {unit}</option></select></label>
       <label>Speed<select aria-label="Speech speed" value={rate} disabled={state==='playing'} onChange={e=>useStore.getState().setSpeechRate(Number(e.target.value))}>{[.5,.75,1,1.25,1.5,1.75,2].map(r=><option key={r} value={r}>{r}×</option>)}</select></label>

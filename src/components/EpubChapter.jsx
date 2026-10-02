@@ -81,7 +81,7 @@ export default function EpubChapter({ book, page, available }) {
       <article className="epubChapter epubFixed" data-page={page} style={{ position: 'relative', width: vw * scale, height: vh * scale, flex: 'none', boxShadow: '0 2px 12px rgba(0,0,0,.35)' }}>
         {React.cloneElement(content, { style: { ...content.props.style, transform: `scale(${scale})` } })}
         {/* Highlights sit outside the scaled page so their measurements stay in screen pixels. */}
-        <TextDecorations rootRef={ref} ready={ready} page={page} layoutKey={`fixed:${scale}:${page}`} />
+        <TextDecorations rootRef={ref} ready={ready} page={page} layoutKey={`fixed:${scale}:${page}`} docPath={book.documentId} />
       </article>
     );
   }
@@ -90,7 +90,7 @@ export default function EpubChapter({ book, page, available }) {
     <article className="epubChapter" data-page={page} style={{ position: 'relative', width: '100%', maxWidth: 850, background: light ? (mode === 'sepia' ? '#f0e6c8' : '#fafafa') : '#161b22', color: light ? '#222' : '#e6edf3', padding: margin, borderRadius: 8 }}>
       <div style={{ position: 'relative' }}>
         {content}
-        <TextDecorations rootRef={ref} ready={ready} page={page} layoutKey={`${size}:${line}:${margin}:${font}:${page}:${styled}`} />
+        <TextDecorations rootRef={ref} ready={ready} page={page} layoutKey={`${size}:${line}:${margin}:${font}:${page}:${styled}`} docPath={book.documentId} />
       </div>
     </article>
   );

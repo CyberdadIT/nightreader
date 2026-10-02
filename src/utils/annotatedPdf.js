@@ -3,6 +3,7 @@
 // The original file is never modified.
 import { loadPdfData } from './storage.js';
 import { saveBinaryFile } from './platform.js';
+import { cleanInk, hexToRgb, inkBounds, pressureWidth } from './ink.js';
 
 const COLORS = {
   'hl-yellow': [1, 0.87, 0], 'hl-blue': [0.31, 0.76, 0.97], 'hl-pink': [0.96, 0.56, 0.69], 'hl-green': [0.65, 0.84, 0.65],
@@ -23,6 +24,27 @@ function appearance(type, boxes, [r, g, b]) {
   return `/GS0 gs ${colour} rg\n` + boxes.map(q => `${n(q.l)} ${n(q.b)} ${n(q.r - q.l)} ${n(q.t - q.b)} re f`).join('\n');
 }
 
+/** A standard /Ink annotation with its own appearance, so the stroke shows in any PDF reader. */
+function inkAnnotation(ctx, a, ink, PDFHexString, PDFString) {
+  const rect = inkBounds(ink).map(n), colour = hexToRgb(ink.color).map(n);
+  const pts = ink.points, avg = pts.reduce((sum, p) => sum + pressureWidth(ink.width, p[2]), 0) / pts.length;
+  const path = pts.length === 1
+    ? `${n(pts[0][0])} ${n(pts[0][1])} m ${n(pts[0][0] + 0.01)} ${n(pts[0][1])} l`
+    : pts.map((p, i) => `${n(p[0])} ${n(p[1])} ${i ? 'l' : 'm'}`).join(' ');
+  const highlighter = ink.color === '#f9a825';
+  const ap = ctx.register(ctx.stream(`${highlighter ? '/GS0 gs ' : ''}${colour.join(' ')} RG ${n(avg)} w 1 J 1 j ${path} S`, {
+    Type: 'XObject', Subtype: 'Form', BBox: rect,
+    Resources: highlighter ? { ExtGState: { GS0: { Type: 'ExtGState', BM: 'Multiply', CA: 0.55 } } } : {},
+  }));
+  return ctx.obj({
+    Type: 'Annot', Subtype: 'Ink', F: 4, Rect: rect, C: colour,
+    InkList: [pts.flatMap(p => [n(p[0]), n(p[1])])], BS: { W: n(avg), S: 'S' },
+    T: PDFHexString.fromText('NightReader'), NM: PDFHexString.fromText(`nightreader-${a.id}`),
+    M: PDFString.fromDate(new Date(a.updatedAt || Date.now())), AP: { N: ap },
+    ...(highlighter ? { CA: 0.55 } : {}),
+  });
+}
+
 /** Returns { bytes, written, skipped }. Notes without stored positions are skipped. */
 export async function annotatePdf(bytes, annotations) {
   const { PDFDocument, PDFHexString, PDFString } = await import('pdf-lib');
@@ -35,6 +57,12 @@ export async function annotatePdf(bytes, annotations) {
   const pages = doc.getPages(), ctx = doc.context;
   let written = 0, skipped = 0;
   for (const a of annotations) {
+    if (a.type === 'ink') {
+      const page = pages[a.page - 1], ink = cleanInk(a.ink);
+      if (!page || !ink) { skipped++; continue; }
+      page.node.addAnnot(ctx.register(inkAnnotation(ctx, a, ink, PDFHexString, PDFString)));
+      written++; continue;
+    }
     const page = pages[a.page - 1];
     if (!page || !a.pdfRects?.length) { skipped++; continue; }
     const boxes = a.pdfRects.map(([x1, y1, x2, y2]) => ({ l: Math.min(x1, x2), r: Math.max(x1, x2), b: Math.min(y1, y2), t: Math.max(y1, y2) }))

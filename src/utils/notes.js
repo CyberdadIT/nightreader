@@ -15,7 +15,7 @@ export function filterNotes(annotations, library, { query = '', type = '', tag =
   const names = new Map(library.map(d => [d.id, d]));
   const q = query.trim().toLowerCase();
   return annotations
-    .filter(a => names.has(a.filePath))
+    .filter(a => names.has(a.filePath) && a.type !== 'ink')
     .filter(a => !type || a.type === type)
     .filter(a => !tag || (a.tags || []).includes(tag))
     .filter(a => !q || [a.quote, a.note, names.get(a.filePath).name, ...(a.tags || [])].some(v => String(v || '').toLowerCase().includes(q)))

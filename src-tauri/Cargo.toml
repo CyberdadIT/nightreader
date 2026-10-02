@@ -1,6 +1,6 @@
 [package]
 name = "nightreader"
-version = "0.7.0"
+version = "0.8.0"
 description = "NightReader — open-source cross-platform PDF reader"
 authors = ["NightReader Contributors"]
 license = "GPL-3.0"

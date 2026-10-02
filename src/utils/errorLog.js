@@ -3,9 +3,14 @@
 const KEY = 'nightreader-errors', MAX = 30;
 
 export function readErrors() {
-  try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { return []; }
+  let stored = [];
+  try { stored = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch { /* unreadable */ }
+  return [...memoryLog, ...stored].slice(0, MAX);
 }
 
+// With the app lock on, errors are kept in memory only: a message can quote document text.
+const memoryLog = [];
+const locked = () => { try { return Boolean(localStorage.getItem('nightreader-lock')); } catch { return false; } };
 export function logError(error, where = '') {
   try {
     const entry = {
@@ -16,11 +21,12 @@ export function logError(error, where = '') {
       stack: String(error?.stack || '').split('\n').slice(0, 6).join('\n').slice(0, 1200),
       version: typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : '',
     };
+    if (locked()) { memoryLog.unshift(entry); memoryLog.length = Math.min(memoryLog.length, MAX); return; }
     localStorage.setItem(KEY, JSON.stringify([entry, ...readErrors()].slice(0, MAX)));
   } catch { /* storage full or unavailable: nothing more to do */ }
 }
 
-export const clearErrors = () => { try { localStorage.removeItem(KEY); } catch { /* ignore */ } };
+export const clearErrors = () => { memoryLog.length = 0; try { localStorage.removeItem(KEY); } catch { /* ignore */ } };
 
 export const errorReport = () => readErrors().map(e => `${e.at} [${e.version}] ${e.where}\n${e.message}\n${e.stack}`).join('\n\n');
 

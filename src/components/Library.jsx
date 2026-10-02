@@ -3,6 +3,8 @@ import {useStore} from '../store/useStore.js';
 import {openFilePicker} from '../utils/platform.js';
 import styles from './Library.module.css';
 import NotesLibrary from './NotesLibrary.jsx';
+import LibrarySearch from './LibrarySearch.jsx';
+import FlashcardReview from './FlashcardReview.jsx';
 export default function Library({onImport,onOpen,onRemove,onJump}) {
   const library=useStore(s=>s.library), collections=useStore(s=>s.collections);
   const update=useStore(s=>s.updateDocument), addCollection=useStore(s=>s.addCollection);
@@ -13,9 +15,9 @@ export default function Library({onImport,onOpen,onRemove,onJump}) {
     <header className={styles.header}><div><h1>Your reading library</h1><p>PDFs and EPUBs stay on this device, even after you close their tabs.</p></div><button onClick={importDocument}>Import PDF or EPUB</button></header>
     {error&&<p role="alert">{error}</p>}
     <div role="tablist" aria-label="Library view" style={{display:'flex',gap:8,marginBottom:16}}>
-      {[['documents','Documents'],['notes','All notes']].map(([id,label])=><button key={id} role="tab" aria-selected={view===id} onClick={()=>setView(id)} style={view===id?{borderColor:'var(--accent)',color:'var(--accent)'}:undefined}>{label}</button>)}
+      {[['documents','Documents'],['search','Search text'],['notes','All notes'],['review','Review flashcards']].map(([id,label])=><button key={id} role="tab" aria-selected={view===id} onClick={()=>setView(id)} style={view===id?{borderColor:'var(--accent)',color:'var(--accent)'}:undefined}>{label}</button>)}
     </div>
-    {view==='notes'?<NotesLibrary onJump={onJump}/>:<>
+    {view==='notes'?<NotesLibrary onJump={onJump}/>:view==='review'?<FlashcardReview onJump={onJump}/>:view==='search'?<LibrarySearch onJump={onJump}/>:<>
     <div className={styles.filters}>
       <input aria-label="Search library" placeholder="Search documents…" value={query} onChange={e=>setQuery(e.target.value)}/>
       <select aria-label="Filter collection" value={filter} onChange={e=>setFilter(e.target.value)}><option value="">All collections</option>{collections.map(c=><option key={c}>{c}</option>)}</select>

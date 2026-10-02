@@ -1,13 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Dialog, { dialogStyles as styles } from './Dialog.jsx';
-import { useStore } from '../store/useStore.js';
+import { useStore, whenSaved } from '../store/useStore.js';
 import { isTauri, pickFile, saveBinaryFile, saveTextFile, copyToClipboard } from '../utils/platform.js';
 import { chooseFolder, openExternal } from '../utils/desktop.js';
 import { checkForUpdate, RELEASES_PAGE } from '../utils/updates.js';
 import { syncNow, useSyncStatus, answerRemovals } from '../hooks/useFolderSync.js';
 import { runSync, keepNotes } from '../utils/syncEngine.js';
 import { makeBackup, restoreBackup, restoreSnapshot } from '../utils/backup.js';
-import { listSnapshots } from '../utils/storage.js';
+import { listSnapshots, resealAll } from '../utils/storage.js';
+import { MIN_PASSPHRASE, changePassphrase, createLock, decryptBackup, encryptBackup, isEncryptedBackup, isUnlocked, lockEnabled, lockInfo, removeLock, saveLockInfo, setAutoLock, setPending, setWritePlain, verifyPassphrase } from '../utils/vault.js';
+import { lockNow } from '../utils/autoLock.js';
 import { OCR_LANGUAGES, installOcrLanguage, installedOcrLanguages, removeOcrLanguage } from '../utils/ocrLanguages.js';
 import { readErrors, clearErrors, errorReport } from '../utils/errorLog.js';
 import { APP_VERSION } from './UpdateBanner.jsx';
@@ -104,22 +106,33 @@ function FileSync() {
 
 function BackupSection() {
   const [withDocs, setWithDocs] = useState(false), [status, setStatus] = useState(''), [busy, setBusy] = useState(false);
+  const [protect, setProtect] = useState(lockEnabled()), [password, setPassword] = useState(''), [restoreFile, setRestoreFile] = useState(null), [restorePassword, setRestorePassword] = useState('');
   async function backup() {
     setBusy(true); setStatus('Preparing backup…');
     try {
+      if (protect && password.length < MIN_PASSPHRASE) throw new Error(`Use at least ${MIN_PASSPHRASE} characters for the backup password.`);
       const result = await makeBackup({ includeDocuments: withDocs });
-      const name = `nightreader-backup-${new Date().toISOString().slice(0, 10)}.zip`;
-      const saved = await saveBinaryFile(name, result.bytes, 'application/zip');
+      const bytes = protect ? await encryptBackup(result.bytes, password) : result.bytes;
+      const name = `nightreader-backup-${new Date().toISOString().slice(0, 10)}.${protect ? 'nrbackup' : 'zip'}`;
+      const saved = await saveBinaryFile(name, bytes, protect ? 'application/octet-stream' : 'application/zip');
+      result.bytes = bytes;
       setStatus(saved === false ? '' : `Backup saved (${megabytes(result.bytes.length)}${withDocs ? `, ${plural(result.documents, 'document')}` : ''}).${result.missing ? ` ${plural(result.missing, 'document')} weren't on this device and were left out.` : ''}`);
     } catch (e) { setStatus(`Couldn't make the backup: ${e.message}`); }
     finally { setBusy(false); }
   }
   async function restore() {
     try {
-      const file = await pickFile('.zip,application/zip');
+      const file = restoreFile || await pickFile('.zip,.nrbackup,application/zip');
       if (!file) return;
+      let data = file.data;
+      if (isEncryptedBackup(data)) {
+        if (!restoreFile || !restorePassword) { setRestoreFile(file); setStatus('This backup is password-protected. Enter its password, then press Restore again.'); return; }
+        setBusy(true); setStatus('Decrypting…');
+        data = await decryptBackup(data, restorePassword);
+      }
       setBusy(true); setStatus('Restoring…');
-      const r = await restoreBackup(file.data);
+      const r = await restoreBackup(data);
+      setRestoreFile(null); setRestorePassword('');
       setStatus(`Restored: ${plural(r.notesAdded, 'new note')}, ${plural(r.notesUpdated, 'updated note')}, ${plural(r.libraryAdded, 'library entry')}, ${plural(r.documentsAdded, 'document')}.${r.rejected ? ` ${plural(r.rejected, 'document')} didn't match their records and were skipped.` : ''} Nothing on this device was deleted.`);
     } catch (e) { setStatus(e.message); }
     finally { setBusy(false); }
@@ -130,11 +143,107 @@ function BackupSection() {
       <input type="checkbox" checked={withDocs} onChange={e => setWithDocs(e.target.checked)} />
       Include the documents themselves (larger file)
     </label>
+    <label className={styles.row} style={{ fontSize: 13 }}>
+      <input type="checkbox" checked={protect} onChange={e => setProtect(e.target.checked)} />
+      Protect the backup with a password (AES-256)
+    </label>
+    {protect && <input type="password" aria-label="Backup password" autoComplete="new-password" placeholder={`Backup password (${MIN_PASSPHRASE}+ characters)`} value={password} onChange={e => setPassword(e.target.value)} />}
+    {restoreFile && <input type="password" aria-label="Password of the backup to restore" placeholder="Password of this backup" value={restorePassword} onChange={e => setRestorePassword(e.target.value)} />}
     <div className={styles.row}>
       <button onClick={backup} disabled={busy}>Save backup…</button>
       <button onClick={restore} disabled={busy}>Restore from backup…</button>
     </div>
     {status && <p role="status">{status}</p>}
+  </>;
+}
+
+const AUTO_LOCK = [[1, '1 minute'], [5, '5 minutes'], [15, '15 minutes'], [60, '1 hour'], [0, 'Only when I lock it']];
+
+/** Passphrase lock with encryption of everything NightReader stores on this device. */
+function AppLockSection() {
+  const unfinished = Boolean(lockInfo()?.pending);
+  const [on, setOn] = useState(lockEnabled() && !unfinished), [mode, setMode] = useState(unfinished ? 'on' : null);
+  const [a, setA] = useState(''), [b, setB] = useState(''), [old, setOld] = useState('');
+  const [minutes, setMinutes] = useState(lockInfo()?.autoLockMinutes ?? 5), [status, setStatus] = useState(''), [busy, setBusy] = useState(false);
+  const reset = () => { setMode(null); setA(''); setB(''); setOld(''); };
+  const progress = (done, total) => setStatus(`Encrypting stored data… ${done} of ${total}`);
+
+  async function turnOn(e) {
+    e.preventDefault();
+    const unfinished = lockInfo()?.pending && isUnlocked();
+    if (!unfinished) {
+      if (a.length < MIN_PASSPHRASE) { setStatus(`Use at least ${MIN_PASSPHRASE} characters. A short sentence is easier to remember and harder to guess.`); return; }
+      if (a !== b) { setStatus("The two passphrases don't match."); return; }
+    }
+    setBusy(true); setStatus('Setting up…');
+    try {
+      // Saved first and marked unfinished: if the app closes part-way, the passphrase
+      // still opens everything and encryption finishes on the next start. A retry after
+      // a failure carries on with the same key rather than making a new one.
+      if (!unfinished) saveLockInfo({ ...(await createLock(a, Number(minutes))), pending: true });
+      useStore.setState({});             // re-save the library and notes, now encrypted
+      await whenSaved();
+      const { failed } = await resealAll(true, progress); // documents, OCR text, snapshots, search index
+      if (failed) throw new Error(`${failed} stored item${failed === 1 ? '' : 's'} couldn't be encrypted (storage full?). Free some space and press the button again to finish.`);
+      setPending(false);
+      clearErrors(); // the stored error log isn't encrypted; from now on errors stay in memory
+      setOn(true); reset();
+      setStatus('App lock is on. Your library, notes and documents on this device are encrypted.');
+    } catch (err) { setStatus(`Couldn't finish turning the lock on: ${err.message}`); setOn(lockEnabled()); }
+    finally { setBusy(false); }
+  }
+  async function turnOff(e) {
+    e.preventDefault();
+    setBusy(true); setStatus('Checking…');
+    try {
+      if (!(await verifyPassphrase(old))) { setStatus('That passphrase is not right.'); return; }
+      setPending(true);                  // if interrupted, the next start re-encrypts
+      setWritePlain(true);               // new writes are plain from here on
+      const { failed } = await resealAll(false, (done, total) => setStatus(`Decrypting stored data… ${done} of ${total}`));
+      if (failed) { setWritePlain(false); await resealAll(true); setPending(false); throw new Error(`${failed} stored item${failed === 1 ? '' : 's'} couldn't be decrypted, so the lock stays on.`); }
+      removeLock();
+      useStore.setState({});
+      setOn(false); reset();
+      setStatus('App lock is off. Stored data is no longer encrypted.');
+    } catch (err) { setStatus(`Couldn't turn the lock off: ${err.message}`); }
+    finally { setBusy(false); }
+  }
+  async function change(e) {
+    e.preventDefault();
+    if (a !== b) { setStatus("The two new passphrases don't match."); return; }
+    setBusy(true);
+    try { await changePassphrase(old, a); reset(); setStatus('Passphrase changed.'); }
+    catch (err) { setStatus(err.message); }
+    finally { setBusy(false); }
+  }
+  const newFields = <>
+    <input type="password" aria-label="New passphrase" autoComplete="new-password" placeholder={`New passphrase (${MIN_PASSPHRASE}+ characters)`} value={a} onChange={e => setA(e.target.value)} />
+    <input type="password" aria-label="Repeat the new passphrase" autoComplete="new-password" placeholder="Repeat it" value={b} onChange={e => setB(e.target.value)} />
+  </>;
+  return <>
+    <p>{on ? 'On. NightReader asks for your passphrase when it starts and after the time below without use. Everything it stores on this device is encrypted (AES-256).'
+      : 'Lock NightReader with a passphrase and encrypt your library, notes and stored documents on this device. If you forget the passphrase, the data can\'t be recovered (keep a backup).'}</p>
+    <label className={styles.row} style={{ fontSize: 13 }}>Lock after
+      <select aria-label="Lock after" value={minutes} onChange={e => { setMinutes(Number(e.target.value)); if (on) setAutoLock(Number(e.target.value)); }} style={{ width: 'auto' }}>
+        {AUTO_LOCK.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      </select>
+    </label>
+    {!on && mode !== 'on' && <div className={styles.row}><button onClick={() => { setMode('on'); setStatus(''); }}>Turn on app lock…</button></div>}
+    {!on && mode === 'on' && <form onSubmit={turnOn} style={{ display: 'grid', gap: 8 }}>{unfinished ? <p>Encryption didn't finish last time. Your passphrase is already set.</p> : newFields}
+      <div className={styles.row}><button type="button" onClick={reset}>Cancel</button><button type="submit" className={styles.primary} disabled={busy}>Turn on and encrypt</button></div></form>}
+    {on && !mode && <div className={styles.row}>
+      <button onClick={lockNow}>Lock now</button>
+      <button onClick={() => { setMode('change'); setStatus(''); }}>Change passphrase…</button>
+      <button onClick={() => { setMode('off'); setStatus(''); }}>Turn off…</button>
+    </div>}
+    {on && mode === 'change' && <form onSubmit={change} style={{ display: 'grid', gap: 8 }}>
+      <input type="password" aria-label="Current passphrase" autoComplete="current-password" placeholder="Current passphrase" value={old} onChange={e => setOld(e.target.value)} />{newFields}
+      <div className={styles.row}><button type="button" onClick={reset}>Cancel</button><button type="submit" className={styles.primary} disabled={busy}>Change passphrase</button></div></form>}
+    {on && mode === 'off' && <form onSubmit={turnOff} style={{ display: 'grid', gap: 8 }}>
+      <input type="password" aria-label="Current passphrase" autoComplete="current-password" placeholder="Current passphrase" value={old} onChange={e => setOld(e.target.value)} />
+      <div className={styles.row}><button type="button" onClick={reset}>Cancel</button><button type="submit" disabled={busy}>Turn off and decrypt</button></div></form>}
+    {status && <p role="status">{status}</p>}
+    {on && <p>The sync file and unprotected backups are not encrypted by the lock. Protect backups with a password below, and keep the sync folder somewhere private.</p>}
   </>;
 }
 
@@ -248,6 +357,9 @@ export default function AppSettings({ onClose, onShortcuts }) {
     <Dialog title="NightReader settings" onClose={onClose}>
       <h3>Sync</h3>
       {desktop ? <FolderSync /> : <FileSync />}
+
+      <h3>App lock</h3>
+      <AppLockSection />
 
       <h3>Backup</h3>
       <BackupSection />

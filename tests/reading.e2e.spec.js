@@ -1,5 +1,7 @@
 import {test,expect} from './fixtures.js';
 import {readFile} from 'node:fs/promises';
+// Less-used view options are in the toolbar's More menu.
+async function menu(page,name){await page.getByRole('button',{name:'More ▾'}).click();await page.getByRole('menu',{name:'More view options'}).getByText(name,{exact:true}).click();}
 async function importFile(page,file){const chooser=page.waitForEvent('filechooser');await page.getByRole('button',{name:'Import PDF or EPUB'}).click();await(await chooser).setFiles(`tests/fixtures/${file}`);}
 async function selectText(page,quote){await page.evaluate(q=>{const root=document.querySelector('[data-text-root]');const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let node;while((node=walker.nextNode())){const start=node.textContent.indexOf(q);if(start>=0){const range=document.createRange();range.setStart(node,start);range.setEnd(node,start+q.length);const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);document.dispatchEvent(new Event('selectionchange'));break;}}},quote);await expect(page.getByRole('toolbar',{name:'Selected text actions'})).toBeVisible();}
 test.beforeEach(async({page})=>{await page.goto('/');await expect(page.getByRole('heading',{name:'Your reading library'})).toBeVisible();});
@@ -14,8 +16,8 @@ test('PDF notes, export, retained library, search, rotation and spread',async({p
  await page.getByRole('button',{name:'Close panel'}).click();
  await page.getByRole('button',{name:'🔍 Find',exact:true}).click();await page.getByRole('textbox',{name:'Search query'}).fill('Learning security');await expect(page.getByRole('search')).toContainText('1 / 12');await expect(page.locator('[data-decoration="search"]').first()).toBeVisible();
  await page.getByRole('button',{name:'Close search'}).click();
- await page.getByRole('button',{name:'Rotate',exact:true}).click();await expect.poll(()=>page.locator('[data-page="1"]').evaluate(el=>el.clientWidth>el.clientHeight)).toBe(true);
- await page.getByRole('button',{name:'Two pages',exact:true}).click();await expect(page.locator('[data-page]')).toHaveCount(2);
+ await menu(page,'Rotate');await expect.poll(()=>page.locator('[data-page="1"]').evaluate(el=>el.clientWidth>el.clientHeight)).toBe(true);
+ await menu(page,'Two pages');await expect(page.locator('[data-page]')).toHaveCount(2);
  await page.getByRole('button',{name:'Close reading.pdf',exact:true}).click();await expect(page.getByRole('heading',{name:'Your reading library'})).toBeVisible();
  await page.reload();await page.getByRole('button',{name:'Continue reading'}).click();await expect(page.locator('[data-text-root]').first()).toContainText('NightReader chapter 1');
  await page.getByRole('button',{name:'☰ Notes',exact:true}).click();await expect(page.getByRole('textbox',{name:'Note for page 1'})).toHaveValue('My saved study note.');expect(errors).toEqual([]);
@@ -37,7 +39,7 @@ test('English OCR uses bundled assets and makes scanned text searchable',async({
  await page.reload();await expect(page.locator('[data-text-root]')).toContainText('Offline OCR');
 });
 test('scroll mode releases offscreen canvas allocations',async({page})=>{
- await importFile(page,'reading.pdf');await expect(page.locator('[data-text-root]')).toContainText('NightReader chapter 1');await page.getByRole('button',{name:'☰ Scroll',exact:true}).click();
+ await importFile(page,'reading.pdf');await expect(page.locator('[data-text-root]')).toContainText('NightReader chapter 1');await menu(page,'Continuous scroll');
  await expect.poll(()=>page.locator('[data-page] canvas').evaluateAll(nodes=>nodes.filter(n=>n.width>0).length)).toBeLessThan(12);
  await page.getByRole('spinbutton',{name:'Current page'}).fill('12');await expect(page.locator('[data-page="12"]')).toBeInViewport();
  await expect.poll(()=>page.locator('[data-page="1"] canvas').evaluate(c=>c.width)).toBe(0);
