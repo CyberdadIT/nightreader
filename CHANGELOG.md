@@ -7,6 +7,7 @@
 - **Read along.** Read aloud now highlights the sentence being read and the current word, and keeps it on screen. Turn it off with "Follow along".
 - **More voices.** On Windows, NightReader now uses all installed voices, including male ones (for UK English: George, Hazel and Susan; for US English: David, Mark and Zira), with the language and gender shown in the menu and a ▶ Preview button. More voices can be added in Windows Settings → Time & language → Speech.
 - **Side by side.** ◫ Side by side shows two documents, or two places in the same one, each with its own page. Click a pane to make it the one the toolbar and keys control.
+- **Tidier toolbar.** Rotate, two pages, continuous scroll, invert, focus, print and reset zoom are now under **More ▾**, so the toolbar fits on one row on smaller screens such as the Surface Pro 4.
 
 ### Study
 - **Search every document.** Library → Search text finds words across your whole library (PDF text, OCR text and EPUB chapters), with snippets; opening a result shows the matches in the document. Accents and case don't matter.

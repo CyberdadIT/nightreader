@@ -92,6 +92,10 @@ An independent review of the lock and encryption code before release found these
 - Turning the lock off could miss records written during the conversion.
 - Finishing an interrupted conversion could restore an older lock record.
 
+## Toolbar
+
+Less-used view options (reset zoom, rotate, two pages, continuous scroll, invert colours, focus mode, print, open document) are in a **More ▾** menu that works with the keyboard (arrow keys, Home, End, Escape). The toolbar now fits on one row at 1368 × 912, the Surface Pro 4's default scaled size, even with the ink options open.
+
 ## Validation recorded
 
 - **Unit tests:** 92 passed. New:
